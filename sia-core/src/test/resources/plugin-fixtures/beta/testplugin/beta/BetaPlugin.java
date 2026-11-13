@@ -1,6 +1,6 @@
 package testplugin.beta;
 
-import com.accord.sia.api.AutomationDescriptor;
+import com.accord.sia.api.Automation;
 import com.accord.sia.api.AutomationPlugin;
 import com.accord.sia.api.PluginContext;
 import com.accord.sia.api.PluginMetadata;
@@ -14,8 +14,8 @@ public final class BetaPlugin implements AutomationPlugin {
   }
 
   @Override
-  public List<AutomationDescriptor> automations() {
-    return List.of(AutomationDescriptor.of("beta.run", "Beta run", "descricao"));
+  public List<Automation> automations() {
+    return List.of(new BetaAutomation());
   }
 
   @Override

@@ -12,12 +12,13 @@ import java.io.IOException;
  * <p>Metodos de transicao sao sincronizados: o daemon pode pedir {@code reload} enquanto um run
  * termina, e o estado nao pode andar para tras.
  */
-public final class LoadedPlugin implements AutoCloseable {
+public final class LoadedPlugin implements PluginRuntime, AutoCloseable {
 
   private final PluginManifest manifest;
   private final AutomationPlugin instance;
   private final PluginClassLoader classLoader;
   private PluginState state = PluginState.LOADED;
+  private PluginContext context;
 
   LoadedPlugin(PluginManifest manifest, AutomationPlugin instance, PluginClassLoader classLoader) {
     this.manifest = manifest;
@@ -29,26 +30,38 @@ public final class LoadedPlugin implements AutoCloseable {
     return manifest;
   }
 
+  @Override
   public String id() {
     return manifest.id();
   }
 
+  @Override
   public PluginState state() {
     return state;
   }
 
-  AutomationPlugin instance() {
+  @Override
+  public AutomationPlugin instance() {
     return instance;
+  }
+
+  @Override
+  public PluginContext context() {
+    if (context == null) {
+      throw new IllegalStateException("plugin " + id() + " nao foi inicializado");
+    }
+    return context;
   }
 
   PluginClassLoader classLoader() {
     return classLoader;
   }
 
-  public synchronized void initialize(PluginContext context) throws PluginLoadException {
+  public synchronized void initialize(PluginContext pluginContext) throws PluginLoadException {
     transition(PluginState.INITIALIZED);
     try {
-      instance.initialize(context);
+      instance.initialize(pluginContext);
+      this.context = pluginContext;
     } catch (RuntimeException error) {
       state = PluginState.FAILED;
       throw new PluginLoadException(id(), "falha em initialize()", error);

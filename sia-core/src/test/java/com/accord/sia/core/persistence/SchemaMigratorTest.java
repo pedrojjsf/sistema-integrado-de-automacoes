@@ -33,7 +33,7 @@ class SchemaMigratorTest {
     migrator.migrate(database);
     migrator.migrate(database);
 
-    assertThat(migrator.userVersion(database)).isEqualTo(1);
+    assertThat(migrator.userVersion(database)).isEqualTo(2);
     assertThat(tables(database)).contains("kv_store");
   }
 

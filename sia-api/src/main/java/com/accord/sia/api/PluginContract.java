@@ -44,15 +44,23 @@ public final class PluginContract {
     }
   }
 
-  public static void validateAutomations(List<AutomationDescriptor> descriptors)
+  public static void validateAutomations(List<Automation> automations)
       throws InvalidPluginException {
-    if (descriptors == null || descriptors.isEmpty()) {
+    if (automations == null || automations.isEmpty()) {
       throw new InvalidPluginException(
           "automations", "plugin precisa expor ao menos uma automacao");
     }
     Set<String> seen = new HashSet<>();
-    for (AutomationDescriptor descriptor : descriptors) {
+    for (Automation automation : automations) {
+      if (automation == null) {
+        throw new InvalidPluginException("automations", "entrada nula");
+      }
+      AutomationDescriptor descriptor = automation.describe();
       validate(descriptor);
+      if (!descriptor.id().equals(automation.id())) {
+        throw new InvalidPluginException(
+            "automation[" + descriptor.id() + "].id", "describe().id() diverge de id()");
+      }
       if (!seen.add(descriptor.id())) {
         throw new InvalidPluginException("automations[" + descriptor.id() + "]", "id duplicado");
       }

@@ -1,0 +1,2 @@
+ALTER TABLE run ADD COLUMN outputs_keys TEXT;
+ALTER TABLE run ADD COLUMN message TEXT;

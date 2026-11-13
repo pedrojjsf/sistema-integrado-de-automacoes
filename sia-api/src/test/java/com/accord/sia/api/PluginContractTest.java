@@ -11,8 +11,21 @@ class PluginContractTest {
   private static final PluginMetadata GOOD_METADATA =
       new PluginMetadata("receitanet-bx", "Receitanet BX", "1.0.0", "1.0", "Accord");
 
-  private static AutomationPlugin pluginOf(
-      PluginMetadata metadata, List<AutomationDescriptor> descriptors) {
+  private static Automation automation(AutomationDescriptor descriptor) {
+    return new Automation() {
+      @Override
+      public AutomationDescriptor describe() {
+        return descriptor;
+      }
+
+      @Override
+      public AutomationResult execute(AutomationContext context) {
+        return AutomationResult.success();
+      }
+    };
+  }
+
+  private static AutomationPlugin pluginOf(PluginMetadata metadata, List<Automation> automations) {
     return new AutomationPlugin() {
       @Override
       public PluginMetadata metadata() {
@@ -20,8 +33,8 @@ class PluginContractTest {
       }
 
       @Override
-      public List<AutomationDescriptor> automations() {
-        return descriptors;
+      public List<Automation> automations() {
+        return automations;
       }
 
       @Override
@@ -32,7 +45,7 @@ class PluginContractTest {
     };
   }
 
-  private static AutomationDescriptor loteCnpj() {
+  private static AutomationDescriptor lote() {
     return AutomationDescriptor.of(
         "receitanet.lote",
         "Lote por CNPJ",
@@ -44,12 +57,12 @@ class PluginContractTest {
 
   @Test
   void aceitaPluginValido() throws InvalidPluginException {
-    PluginContract.validate(pluginOf(GOOD_METADATA, List.of(loteCnpj())));
+    PluginContract.validate(pluginOf(GOOD_METADATA, List.of(automation(lote()))));
   }
 
   @Test
   void rejeitaMetadataNulo() {
-    assertThatThrownBy(() -> PluginContract.validate(pluginOf(null, List.of(loteCnpj()))))
+    assertThatThrownBy(() -> PluginContract.validate(pluginOf(null, List.of(automation(lote())))))
         .isInstanceOfSatisfying(
             InvalidPluginException.class, error -> assertThat(error.field()).isEqualTo("metadata"));
   }
@@ -94,7 +107,8 @@ class PluginContractTest {
 
   @Test
   void rejeitaAutomacaoDuplicada() {
-    assertThatThrownBy(() -> PluginContract.validateAutomations(List.of(loteCnpj(), loteCnpj())))
+    assertThatThrownBy(() ->
+            PluginContract.validateAutomations(List.of(automation(lote()), automation(lote()))))
         .isInstanceOfSatisfying(
             InvalidPluginException.class,
             error -> assertThat(error.field()).contains("receitanet.lote"));
@@ -102,7 +116,7 @@ class PluginContractTest {
 
   @Test
   void rejeitaIdDeAutomacaoSemFormatoPluginAcao() {
-    var descriptor = AutomationDescriptor.of("send", "Lote por CNPJ", "sem prefixo");
+    var descriptor = AutomationDescriptor.of("lote", "Lote", "sem prefixo");
 
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(
@@ -113,8 +127,7 @@ class PluginContractTest {
   @Test
   void rejeitaParametroSensivelComValorPadrao() {
     var spec = ParamSpec.optional("token", ParamType.STRING, "token", "abc").asSensitive();
-    var descriptor =
-        AutomationDescriptor.of("receitanet.lote", "Lote por CNPJ", "desc", List.of(spec));
+    var descriptor = AutomationDescriptor.of("receitanet.lote", "Lote", "desc", List.of(spec));
 
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(
@@ -126,16 +139,25 @@ class PluginContractTest {
     var descriptor =
         AutomationDescriptor.of(
             "receitanet.lote",
-            "Lote por CNPJ",
+            "Lote",
             "desc",
             List.of(
-                ParamSpec.required("to", ParamType.STRING, "a"),
-                ParamSpec.required("to", ParamType.STRING, "b")));
+                ParamSpec.required("arquivo", ParamType.STRING, "a"),
+                ParamSpec.required("arquivo", ParamType.STRING, "b")));
 
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(
             InvalidPluginException.class,
             error -> assertThat(error.field()).contains("receitanet.lote"));
+  }
+
+  @Test
+  void rejeitaAutomacaoNulaNaLista() {
+    assertThatThrownBy(
+            () -> PluginContract.validateAutomations(java.util.Arrays.asList((Automation) null)))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).isEqualTo("automations"));
   }
 
   @Test

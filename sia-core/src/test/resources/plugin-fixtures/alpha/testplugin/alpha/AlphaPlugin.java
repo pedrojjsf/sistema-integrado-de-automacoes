@@ -1,6 +1,6 @@
 package testplugin.alpha;
 
-import com.accord.sia.api.AutomationDescriptor;
+import com.accord.sia.api.Automation;
 import com.accord.sia.api.AutomationPlugin;
 import com.accord.sia.api.PluginContext;
 import com.accord.sia.api.PluginMetadata;
@@ -18,8 +18,8 @@ public final class AlphaPlugin implements AutomationPlugin {
   }
 
   @Override
-  public List<AutomationDescriptor> automations() {
-    return List.of(AutomationDescriptor.of("alpha.run", "Alpha run", "descricao"));
+  public List<Automation> automations() {
+    return List.of(new AlphaAutomation());
   }
 
   @Override

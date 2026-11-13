@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.accord.sia.api.InvalidPluginException;
 import com.accord.sia.api.PluginLoadException;
+import com.accord.sia.core.testsupport.TestContexts;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

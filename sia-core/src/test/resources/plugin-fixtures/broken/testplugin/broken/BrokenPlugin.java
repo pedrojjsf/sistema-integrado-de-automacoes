@@ -1,6 +1,6 @@
 package testplugin.broken;
 
-import com.accord.sia.api.AutomationDescriptor;
+import com.accord.sia.api.Automation;
 import com.accord.sia.api.AutomationPlugin;
 import com.accord.sia.api.PluginContext;
 import com.accord.sia.api.PluginMetadata;
@@ -15,7 +15,7 @@ public final class BrokenPlugin implements AutomationPlugin {
   }
 
   @Override
-  public List<AutomationDescriptor> automations() {
+  public List<Automation> automations() {
     return List.of();
   }
 

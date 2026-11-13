@@ -3,13 +3,18 @@ package com.accord.sia.api;
 /**
  * Unidade executavel exposta por um plugin.
  *
- * <p>Um plugin pode registrar varias automacoes. O Core executa a automacao, nao o plugin: e por
- * isso que {@code execute} vive aqui e nao em {@link AutomationPlugin}.
+ * <p>Descricao e execucao vivem no mesmo objeto de proposito: assim o Catalogo nao pode divergir do
+ * codigo — nao existe "descrevi uma coisa e implementei outra".
  */
 public interface Automation {
 
-  /** Identificador qualificado, igual ao declarado em {@link AutomationDescriptor#id()}. */
-  String id();
+  /** Metadados da automacao; e a fonte da verdade do id usado em {@link #execute}. */
+  AutomationDescriptor describe();
+
+  /** Atalho para {@code describe().id()}. */
+  default String id() {
+    return describe().id();
+  }
 
   /**
    * Executa a automacao.
