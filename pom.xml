@@ -18,6 +18,7 @@
     <module>sia-server</module>
     <module>sia-cli</module>
     <module>sia-testkit</module>
+    <module>integrations/receitanet-bx</module>
   </modules>
 
   <properties>

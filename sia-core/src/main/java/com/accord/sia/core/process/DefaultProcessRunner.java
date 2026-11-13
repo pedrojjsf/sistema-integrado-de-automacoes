@@ -50,7 +50,11 @@ public final class DefaultProcessRunner implements ProcessRunner {
 
     Process process;
     try {
-      process = new ProcessBuilder(command).start();
+      ProcessBuilder builder = new ProcessBuilder(command);
+      if (request.workingDirectory() != null) {
+        builder.directory(request.workingDirectory().toFile());
+      }
+      process = builder.start();
     } catch (IOException error) {
       throw new ProcessException(
           ProcessException.Reason.NOT_FOUND,

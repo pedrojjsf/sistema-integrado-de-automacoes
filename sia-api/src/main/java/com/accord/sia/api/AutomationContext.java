@@ -17,6 +17,7 @@ import java.util.Objects;
  * @param storage armazenamento namespaced do plugin
  * @param events publicacao de eventos
  * @param secrets leitura de segredos
+ * @param processes execucao de processos externos pela allowlist do Core
  * @param clock relogio do Core
  */
 public record AutomationContext(
@@ -31,6 +32,7 @@ public record AutomationContext(
     Storage storage,
     EventPublisher events,
     SecretAccess secrets,
+    ProcessRunner processes,
     Clock clock) {
 
   public AutomationContext {
@@ -45,6 +47,7 @@ public record AutomationContext(
     Objects.requireNonNull(storage, "storage");
     Objects.requireNonNull(events, "events");
     Objects.requireNonNull(secrets, "secrets");
+    Objects.requireNonNull(processes, "processes");
     Objects.requireNonNull(clock, "clock");
   }
 }

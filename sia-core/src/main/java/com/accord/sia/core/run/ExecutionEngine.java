@@ -111,6 +111,7 @@ public final class ExecutionEngine implements AutoCloseable {
               plugin.context().storage(),
               plugin.context().events(),
               plugin.context().secrets(),
+              plugin.context().processes(),
               clock);
       AutomationResult result = invoke(automation, context, timeout, cancellation);
       status = mapStatus(result.status());

@@ -103,6 +103,16 @@ class DefaultProcessRunnerTest {
   }
 
   @Test
+  void respeitaDiretorioDeTrabalho() throws java.io.IOException {
+    java.nio.file.Path workDir = java.nio.file.Files.createTempDirectory("sia-pwd");
+    ProcessResult result =
+        runner.run(ProcessRequest.of("echo", "pwd").withWorkingDirectory(workDir));
+
+    java.nio.file.Path reported = java.nio.file.Path.of(result.stdout().strip());
+    assertThat(reported.toRealPath()).isEqualTo(workDir.toRealPath());
+  }
+
+  @Test
   void allowlistRespondeConsultas() {
     assertThat(allowlist.allows("echo")).isTrue();
     assertThat(allowlist.allows("chrome")).isFalse();

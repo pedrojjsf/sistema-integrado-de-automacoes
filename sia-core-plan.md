@@ -54,7 +54,7 @@ public interface AutomationPlugin {
 }
 
 public interface Automation {
-    String id();                                // "email.send"
+    String id();                                // "receitanet.lote"
     AutomationResult execute(AutomationContext ctx) throws AutomationException;
 }
 ```
@@ -200,9 +200,10 @@ ecac camila/
 ├── sia-server/              # daemon Javalin, composition root, graceful shutdown
 ├── sia-cli/                 # cliente picocli (HTTP, JSON) — não toca banco
 ├── sia-testkit/             # harness in-process p/ autores de plugin
+├── integrations/receitanet-bx/  # primeiro plugin real (kind: java, ADR-0001)
 ├── docs/{PLUGIN_GUIDE.md, adr/, api/openapi.yaml}   # ADR-0001: receitanet como plugin java
 ├── data/                    # sia.db, backups/ (git-ignored)
-└── .agents/                 # toolkit (intocado)
+└── automacao/               # binário do bot (git-ignored)
 ```
 
 `sia-api` não depende de `sia-core`; plugins enxergam **só** `sia-api` + `sia-testkit`; `sia-cli` não depende de `sia-api` (fala só JSON — contrato por schema, não por classe compartilhada); `sia-auth` não conhece plugin nenhum, só identidade.
@@ -274,8 +275,8 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
   → *Verificado:* `mvn -pl sia-core -am test` = 61 no total; executável fora da allowlist → `NOT_ALLOWED` antes de subir; `sleep 30s` com timeout 600 ms morre e retorna `timedOut`; valor sensível vira `***` na saída; plugin sem a permissão recebe `PermissionDeniedException`.
 - [ ] **T4c — Host de plugin de processo** · `backend-specialist` / `api-patterns` — implementar `stdio-jsonl-v1`: `describe`/`execute`/`cancel`/`shutdown`, leitura de stdout com timeout, `progress`/`log`/`error` do filho, stderr capturado, morte da árvore de processos no cancelamento, handshake de versão de protocolo.
   → *Verificar:* plugin-exemplo em Python responde `describe` e executa; plugin que trava é morto no timeout; stdout poluído (texto fora do JSON) não quebra o host; cancelamento mata a árvore.
-- [ ] **T13 — Plugin `receitanet-bx`** (ADR-0001: `kind: java`) · `backend-specialist` + `test-engineer` — 6 automações da tabela acima, validação de data antes do processo, parser de saída com `errorCode` estável, certificado do Windows sem PIN, `plugin.yml` com `permissions: [process]`, testes com processo fake (`ProcessRunner` stub) + integração real opt-in (`-Dsia.receitanet.path=...`).
-  → *Verificar:* `receitanet.diag` contra o bot instalado devolve `SUCCESS` com contagem de sistemas; `lote` com data `31/04` falha em < 1s sem subir processo; `diag` com warnings (exit `-1`) não é tratado como falha quando a saída indica sucesso.
+- [x] **T13 — Plugin `receitanet-bx`** (ADR-0001: `kind: java`) · `backend-specialist` + `test-engineer` — módulo `integrations/receitanet-bx`: 6 automações (`diag`, `catalogo`, `lote`, `pedidos`, `pendentes`, `baixar`), validação de data/arquivo/sistemas **antes** de subir processo, tradução de erros do Derby (`XSDB6` → banco ocupado, `42818`/`42S02` → incompatível, `XJ040` → inacessível), `diag` que aceita exit `-1` com saída saudável, sem PIN (certificado do Windows), `plugin.yml` com `permissions: [process]` e `requires-os: [windows]`. **22 testes unitários + 1 IT real.**
+  → *Verificado:* `ReceitanetDiagIT` executou o bot real pelo SIA e retornou `SUCCESS` em ~4 s; data `31/04` falha em milissegundos sem subir processo; `baixar` recusa `pedido` e `todos` juntos. Duas adições de contrato entraram: `ProcessRequest.workingDirectory` (o bot grava `bot.log`/`erros/` no cwd) e `AutomationContext.processes()`.
 - [ ] **T12 — Guia + segundo exemplo + hardening** · `documentation-writer` + `security-auditor` — `docs/PLUGIN_GUIDE.md` usando o `receitanet-bx` como caso real, um segundo plugin mínimo (sem dependências de e-mail/planilha), ADRs D1–D15, deprecação SemVer, compatibilidade binária.
   → *Verificar:* guia executado ponta a ponta pelo time; exemplo mínimo compila só contra `api`+`testkit`; cobertura do core ≥ 80%.
 
@@ -314,7 +315,7 @@ java -jar sia-server/target/sia-server.jar --config config/local.yml &
 curl -s localhost:8080/api/health
 TOKEN=$(./sia-cli login --print-token)   # ou token do IdP
 curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/plugins
-java -jar sia-cli/target/sia-cli.jar run email.send -p to=dev@example.com
+java -jar sia-cli/target/sia-cli.jar run receitanet.diag
 java -jar sia-cli/target/sia-cli.jar runs --limit 5
 ./mvnw -q -pl sia-core test -Dtest=PermissionEnforcementTest,PluginIsolationTest,NoSensitiveDataTest,SqliteConcurrencyTest,WorkflowResumeTest
 ```
