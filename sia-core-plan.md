@@ -107,6 +107,7 @@ O SIA é **resource server**, não provedor de identidade: não tem tela de logi
 | `sia.admin` | + install/enable/disable/reload de plugin, CRUD de schedule |
 
 - Sem permissão → **403**; sem token válido → **401** com `WWW-Authenticate: Bearer`.
+- **Execução sem humano** (scheduler, workflow, trigger de evento) não tem token de usuário: o `run` grava `actor = system:scheduler` **e** `on_behalf_of` = `sub` de quem criou o `schedule` (coluna `schedule.owner`). Assim o histórico nunca perde a origem sem inventar identidade.
 - **CLI**: `sia-cli login` usa **Authorization Code + PKCE** com redirect em loopback (`127.0.0.1:<porta efêmera>`), abre o navegador para o IdP e guarda o refresh token em `~/.sia/credentials.json` (permissão `0600`; no Windows, ACL do usuário). `--dev-token` só é aceito com `auth.mode=dev` em config, nunca por padrão.
 - Modo `dev` (sem IdP, para destravar o time): token estático local, explicitamente marcado no `/api/health` como `"auth":"dev"`.
 
