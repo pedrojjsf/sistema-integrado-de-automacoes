@@ -187,8 +187,8 @@ ecac camila/
 
 - [x] **T0 — Ambiente + repo** · `devops-engineer` — JDK 21, Maven 3.10 + wrapper, branch, `.gitignore`, `.gitattributes`.
 - [x] **T1 — Esqueleto multi-módulo** · `backend-specialist` / `clean-code` — 7 módulos `sia-*` (incl. `sia-auth`), enforcer, jacoco, spotless. `BUILD SUCCESS` verificado.
-- [ ] **T2 — Contratos (`sia-api`)** · `backend-specialist` / `api-patterns` — interfaces/records, `ParamSpec.sensitive`, `Parameters`, `CancellationToken`, `ProgressSink`, 4 exceções; javadoc; teste de contrato (id duplicado, metadado nulo, descriptor sem `id`).
-  → *Verificar:* `mvn -q -pl sia-api verify` verde; contratos sem dependência de Jackson/SQLite.
+- [x] **T2 — Contratos (`sia-api`)** · `backend-specialist` / `api-patterns` — `AutomationPlugin`, `Automation`, `AutomationDescriptor`, `ParamSpec` (com `sensitive`), `PluginContext`, `AutomationContext` (runId/actor/params/serviços), `AutomationResult` (só chaves de saída), `Parameters` tipado, fachadas `Log`/`Storage`/`SecretAccess`/`EventPublisher`/`ProgressSink`/`CancellationToken`/`Configuration`, 6 exceções e `PluginContract` validando por campo. **26 testes verdes.**
+  → *Verificado:* `mvn -pl sia-api test` = 26/26; `dependency:tree` do api segue só com `slf4j-api`; contrato rejeita metadata nula, id com maiúscula, `apiVersion: 2.0`, automação duplicada e parâmetro sensível com valor padrão.
 - [ ] **T3 — Manifesto + validação** · `backend-specialist` / `api-patterns` — `plugin.yml`, JSON Schema, `PluginDescriptor`, compatibilidade `api-version`, `PluginValidator` (7 checagens).
   → *Verificar:* fixtures inválidas (id maiúsculo, `main` ausente, permission desconhecida, `api-version: 2.0`) com erro por campo.
 - [ ] **T4 — Discovery + loader + estados** · `backend-specialist` / `clean-code` — varredura de `plugins/`, `URLClassLoader` filho, registro, transições tabeladas, `close()` no unload.

@@ -1,0 +1,147 @@
+package com.accord.sia.api;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class PluginContractTest {
+
+  private static final PluginMetadata GOOD_METADATA =
+      new PluginMetadata("email-automation", "Email Automation", "1.0.0", "1.0", "Accord");
+
+  private static AutomationPlugin pluginOf(
+      PluginMetadata metadata, List<AutomationDescriptor> descriptors) {
+    return new AutomationPlugin() {
+      @Override
+      public PluginMetadata metadata() {
+        return metadata;
+      }
+
+      @Override
+      public List<AutomationDescriptor> automations() {
+        return descriptors;
+      }
+
+      @Override
+      public void initialize(PluginContext context) {}
+
+      @Override
+      public void shutdown() {}
+    };
+  }
+
+  private static AutomationDescriptor sendEmail() {
+    return AutomationDescriptor.of(
+        "email.send",
+        "Enviar e-mail",
+        "Envia mensagem",
+        List.of(
+            ParamSpec.required("to", ParamType.STRING, "destinatario"),
+            ParamSpec.optional("smtpPassword", ParamType.STRING, "senha SMTP").asSensitive()));
+  }
+
+  @Test
+  void aceitaPluginValido() throws InvalidPluginException {
+    PluginContract.validate(pluginOf(GOOD_METADATA, List.of(sendEmail())));
+  }
+
+  @Test
+  void rejeitaMetadataNulo() {
+    assertThatThrownBy(() -> PluginContract.validate(pluginOf(null, List.of(sendEmail()))))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class, error -> assertThat(error.field()).isEqualTo("metadata"));
+  }
+
+  @Test
+  void rejeitaIdDePluginComMaiuscula() {
+    var metadata = new PluginMetadata("Email-Automation", "Email", "1.0.0", "1.0");
+
+    assertThatThrownBy(() -> PluginContract.validate(metadata))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).isEqualTo("metadata.id"));
+  }
+
+  @Test
+  void rejeitaVersaoForaDeSemver() {
+    var metadata = new PluginMetadata("email-automation", "Email", "1.0", "1.0");
+
+    assertThatThrownBy(() -> PluginContract.validate(metadata))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).isEqualTo("metadata.version"));
+  }
+
+  @Test
+  void rejeitaApiVersionIncompativel() {
+    var metadata = new PluginMetadata("email-automation", "Email", "1.0.0", "2.0");
+
+    assertThatThrownBy(() -> PluginContract.validate(metadata))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).isEqualTo("metadata.apiVersion"));
+  }
+
+  @Test
+  void rejeitaPluginSemAutomacao() {
+    assertThatThrownBy(() -> PluginContract.validateAutomations(List.of()))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).isEqualTo("automations"));
+  }
+
+  @Test
+  void rejeitaAutomacaoDuplicada() {
+    assertThatThrownBy(() -> PluginContract.validateAutomations(List.of(sendEmail(), sendEmail())))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).contains("email.send"));
+  }
+
+  @Test
+  void rejeitaIdDeAutomacaoSemFormatoPluginAcao() {
+    var descriptor = AutomationDescriptor.of("send", "Enviar", "sem prefixo");
+
+    assertThatThrownBy(() -> PluginContract.validate(descriptor))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).isEqualTo("automation.id"));
+  }
+
+  @Test
+  void rejeitaParametroSensivelComValorPadrao() {
+    var spec = ParamSpec.optional("token", ParamType.STRING, "token", "abc").asSensitive();
+    var descriptor = AutomationDescriptor.of("email.send", "Enviar", "desc", List.of(spec));
+
+    assertThatThrownBy(() -> PluginContract.validate(descriptor))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class, error -> assertThat(error.field()).contains("token"));
+  }
+
+  @Test
+  void rejeitaParametroDuplicado() {
+    var descriptor =
+        AutomationDescriptor.of(
+            "email.send",
+            "Enviar",
+            "desc",
+            List.of(
+                ParamSpec.required("to", ParamType.STRING, "a"),
+                ParamSpec.required("to", ParamType.STRING, "b")));
+
+    assertThatThrownBy(() -> PluginContract.validate(descriptor))
+        .isInstanceOfSatisfying(
+            InvalidPluginException.class,
+            error -> assertThat(error.field()).contains("email.send"));
+  }
+
+  @Test
+  void compatibilidadeConsideraApenasMajor() {
+    assertThat(PluginContract.isApiCompatible("1.0")).isTrue();
+    assertThat(PluginContract.isApiCompatible("1.7")).isTrue();
+    assertThat(PluginContract.isApiCompatible("2.0")).isFalse();
+    assertThat(PluginContract.isApiCompatible(null)).isFalse();
+  }
+}
