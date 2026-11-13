@@ -85,6 +85,10 @@ class ReceitanetDiagIT {
           .as("saida do bot: %s", outcome.message())
           .isEqualTo(RunStatus.SUCCESS);
       assertThat(outcome.message()).isEqualTo("diagnostico executado");
+
+      System.out.printf(
+          "[SIA] run=%s status=%s duracao=%sms outputs=%s%n",
+          outcome.runId(), outcome.status(), outcome.duration().toMillis(), outcome.outputs());
     }
   }
 
