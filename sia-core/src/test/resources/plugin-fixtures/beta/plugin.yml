@@ -1,0 +1,7 @@
+id: beta-plugin
+name: Beta
+version: 1.0.0
+api-version: "1.0"
+kind: java
+main: testplugin.beta.BetaPlugin
+permissions: []

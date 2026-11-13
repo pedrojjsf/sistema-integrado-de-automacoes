@@ -200,7 +200,7 @@ ecac camila/
 ├── sia-server/              # daemon Javalin, composition root, graceful shutdown
 ├── sia-cli/                 # cliente picocli (HTTP, JSON) — não toca banco
 ├── sia-testkit/             # harness in-process p/ autores de plugin
-├── docs/{PLUGIN_GUIDE.md, adr/, api/openapi.yaml}
+├── docs/{PLUGIN_GUIDE.md, adr/, api/openapi.yaml}   # ADR-0001: receitanet como plugin java
 ├── data/                    # sia.db, backups/ (git-ignored)
 └── .agents/                 # toolkit (intocado)
 ```
@@ -252,8 +252,8 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
   → *Verificado:* `mvn -pl sia-api test` = 26/26; `dependency:tree` do api segue só com `slf4j-api`; contrato rejeita metadata nula, id com maiúscula, `apiVersion: 2.0`, automação duplicada e parâmetro sensível com valor padrão.
 - [x] **T3 — Manifesto + validação** · `backend-specialist` / `api-patterns` — `PluginManifest` com `kind` (`java`/`process`), `PluginKind`, `PluginPermission` no `sia-api`, JSON Schema em `sia-core/src/main/resources/schemas/`, validação estrita (campo desconhecido é erro) com mensagem por campo. **18 testes verdes.**
   → *Verificado:* `mvn -pl sia-core -am test` = 18/18; manifesto `process` do receitanet aceito com protocolo padrão; rejeita campo com typo, id maiúsculo, `api-version: 2.0`, `main` faltando no `java`, `command` absoluto ou com `..`, permissão desconhecida, dependência de si mesmo e `requires-os` inválido.
-- [ ] **T4 — Discovery + loader + estados** · `backend-specialist` / `clean-code` — varredura de `plugins/`, `URLClassLoader` filho, registro, transições tabeladas, `close()` no unload.
-  → *Verificar:* classe do plugin A invisível ao B; transição ilegal lança; teste de leak (`WeakReference` + threads).
+- [x] **T4 — Discovery + loader + estados** · `backend-specialist` / `clean-code` — `PluginDiscovery` (pasta = `plugin.yml` + 1 JAR), `PluginClassLoader` filho-primeiro com pacotes compartilhados (`sia-api`, `slf4j`), `PluginLoader`, `LoadedPlugin` com máquina de estados, `PluginRegistry` com detecção de duplicata e `unloadAll`. **10 testes verdes** (fixtures compiladas em tempo de teste contra o `sia-api`, não no classpath do teste).
+  → *Verificado:* classe do plugin beta invisível ao alpha; transição `LOADED → DISABLED` lança; `unload` chama `shutdown()` e fecha o JAR (classe não carregada antes falha depois); duplicata recusada; `kind: process` rejeitado com mensagem explícita até o T4c.
 - [ ] **T5 — Serviços + permissões + persistência** · `security-auditor` / `vulnerability-scanner` — logger com MDC, config tipada, `Storage` (`kv_store`), `EventPublisher`, `SecretStore` (`env`), `PermissionGuard` + `PermissionProbe`, `SingleWriter`, migrações, `NoSensitiveDataTest`.
   → *Verificar:* plugin sem `network` → `PermissionDeniedException`; storage de A não alcança chave de B; 200 escritas concorrentes sem `SQLITE_BUSY`; fixture com CPF/e-mail/senha não aparece em `.db` nem em log.
 - [ ] **T6 — Execution Engine** · `backend-specialist` / `testing-patterns` — virtual threads, bulkhead por plugin, timeout, cancelamento, `RunRecord` com `actor`, retry/backoff.
@@ -274,7 +274,7 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
   → *Verificar:* plugin sem `EXEC_PROCESS` → `PermissionDeniedException`; executável fora da allowlist → erro antes de subir processo; `sleep.py` de 10s com timeout 1s é morto (sem processo órfão); nenhum argumento sensível fica na saída persistida.
 - [ ] **T4c — Host de plugin de processo** · `backend-specialist` / `api-patterns` — implementar `stdio-jsonl-v1`: `describe`/`execute`/`cancel`/`shutdown`, leitura de stdout com timeout, `progress`/`log`/`error` do filho, stderr capturado, morte da árvore de processos no cancelamento, handshake de versão de protocolo.
   → *Verificar:* plugin-exemplo em Python responde `describe` e executa; plugin que trava é morto no timeout; stdout poluído (texto fora do JSON) não quebra o host; cancelamento mata a árvore.
-- [ ] **T13 — Plugin `receitanet-bx`** · `backend-specialist` + `test-engineer` — 6 automações da tabela acima, validação de data antes do processo, parser de saída com `errorCode` estável, certificado do Windows sem PIN, `plugin.yml` com `permissions: [process]`, testes com processo fake (`ProcessRunner` stub) + integração real opt-in (`-Dsia.receitanet.path=...`).
+- [ ] **T13 — Plugin `receitanet-bx`** (ADR-0001: `kind: java`) · `backend-specialist` + `test-engineer` — 6 automações da tabela acima, validação de data antes do processo, parser de saída com `errorCode` estável, certificado do Windows sem PIN, `plugin.yml` com `permissions: [process]`, testes com processo fake (`ProcessRunner` stub) + integração real opt-in (`-Dsia.receitanet.path=...`).
   → *Verificar:* `receitanet.diag` contra o bot instalado devolve `SUCCESS` com contagem de sistemas; `lote` com data `31/04` falha em < 1s sem subir processo; `diag` com warnings (exit `-1`) não é tratado como falha quando a saída indica sucesso.
 - [ ] **T12 — Guia + segundo exemplo + hardening** · `documentation-writer` + `security-auditor` — `docs/PLUGIN_GUIDE.md` usando o `receitanet-bx` como caso real, um segundo plugin mínimo (sem dependências de e-mail/planilha), ADRs D1–D15, deprecação SemVer, compatibilidade binária.
   → *Verificar:* guia executado ponta a ponta pelo time; exemplo mínimo compila só contra `api`+`testkit`; cobertura do core ≥ 80%.
