@@ -5,19 +5,19 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.example.automation</groupId>
-    <artifactId>automation-parent</artifactId>
+    <groupId>com.sia</groupId>
+    <artifactId>sia-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>automation-core</artifactId>
-  <name>Automation Core</name>
-  <description>Loader, ciclo de vida, execution engine, scheduler, event bus e persistencia SQLite.</description>
+  <artifactId>sia-core</artifactId>
+  <name>SIA Core</name>
+  <description>Plugin manager, loader, ciclo de vida, execution engine, scheduler, event bus e persistencia SQLite.</description>
 
   <dependencies>
     <dependency>
-      <groupId>com.example.automation</groupId>
-      <artifactId>automation-api</artifactId>
+      <groupId>com.sia</groupId>
+      <artifactId>sia-api</artifactId>
     </dependency>
 
     <dependency>

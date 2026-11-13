@@ -4,18 +4,19 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.example.automation</groupId>
-  <artifactId>automation-parent</artifactId>
+  <groupId>com.sia</groupId>
+  <artifactId>sia-parent</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>Automation Core</name>
-  <description>Extensible plugin-based automation platform</description>
+  <name>SIA - Sistema Integrado de Automacoes</name>
+  <description>Plataforma de automacao extensivel baseada em plugins (Core + Plugin Runtime)</description>
 
   <modules>
-    <module>automation-api</module>
-    <module>automation-core</module>
-    <module>automation-cli</module>
-    <module>automation-testkit</module>
+    <module>sia-api</module>
+    <module>sia-core</module>
+    <module>sia-server</module>
+    <module>sia-cli</module>
+    <module>sia-testkit</module>
   </modules>
 
   <properties>
@@ -24,8 +25,10 @@
     <maven.compiler.release>21</maven.compiler.release>
 
     <slf4j.version>2.0.16</slf4j.version>
+    <logback.version>1.5.12</logback.version>
     <jackson.version>2.18.2</jackson.version>
     <picocli.version>4.7.6</picocli.version>
+    <javalin.version>6.4.0</javalin.version>
     <sqlite.version>3.47.1.0</sqlite.version>
     <cronutils.version>9.2.1</cronutils.version>
 
@@ -44,18 +47,18 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.example.automation</groupId>
-        <artifactId>automation-api</artifactId>
+        <groupId>com.sia</groupId>
+        <artifactId>sia-api</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.example.automation</groupId>
-        <artifactId>automation-core</artifactId>
+        <groupId>com.sia</groupId>
+        <artifactId>sia-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.example.automation</groupId>
-        <artifactId>automation-testkit</artifactId>
+        <groupId>com.sia</groupId>
+        <artifactId>sia-testkit</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -63,6 +66,11 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-classic</artifactId>
+        <version>${logback.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
@@ -83,6 +91,11 @@
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>${picocli.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.javalin</groupId>
+        <artifactId>javalin</artifactId>
+        <version>${javalin.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>

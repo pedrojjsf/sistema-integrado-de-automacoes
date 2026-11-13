@@ -5,33 +5,30 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.example.automation</groupId>
-    <artifactId>automation-parent</artifactId>
+    <groupId>com.sia</groupId>
+    <artifactId>sia-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>automation-testkit</artifactId>
-  <name>Automation TestKit</name>
-  <description>Harness in-memory + SQLite temporario para autores de plugin.</description>
+  <artifactId>sia-api</artifactId>
+  <name>SIA API</name>
+  <description>Contratos publicos do Core. Plugins dependem SOMENTE deste modulo.</description>
 
   <dependencies>
     <dependency>
-      <groupId>com.example.automation</groupId>
-      <artifactId>automation-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.example.automation</groupId>
-      <artifactId>automation-core</artifactId>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
     </dependency>
 
-    <!-- compile: os testes do plugin consomem assercoes e extensoes -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

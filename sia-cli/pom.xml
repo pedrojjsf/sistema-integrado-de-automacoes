@@ -5,32 +5,27 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.example.automation</groupId>
-    <artifactId>automation-parent</artifactId>
+    <groupId>com.sia</groupId>
+    <artifactId>sia-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>automation-cli</artifactId>
-  <name>Automation CLI</name>
-  <description>Composition root: commands plugins, run, runs, logs, workflow, doctor.</description>
-
-  <properties>
-    <logback.version>1.5.12</logback.version>
-  </properties>
+  <artifactId>sia-cli</artifactId>
+  <name>SIA CLI</name>
+  <description>Cliente de linha de comando do daemon. Fala apenas JSON com o /api - nao acessa banco nem disco do Core.</description>
 
   <dependencies>
-    <dependency>
-      <groupId>com.example.automation</groupId>
-      <artifactId>automation-core</artifactId>
-    </dependency>
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>${logback.version}</version>
     </dependency>
 
     <dependency>
