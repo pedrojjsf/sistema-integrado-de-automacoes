@@ -87,6 +87,14 @@ public final class PluginContract {
     }
   }
 
+  public static boolean isValidPluginId(String id) {
+    return id != null && PLUGIN_ID.matcher(id).matches();
+  }
+
+  public static boolean isValidVersion(String version) {
+    return version != null && SEMVER.matcher(version).matches();
+  }
+
   /** Mesma major da API corrente significa compativel. */
   public static boolean isApiCompatible(String apiVersion) {
     if (apiVersion == null || apiVersion.isBlank()) {
