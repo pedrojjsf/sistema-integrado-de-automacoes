@@ -2,7 +2,7 @@
 
 > Plano de implementação (modo PLANNING — só andaime de build escrito até agora).
 > `@project-planner` + skills `plan-writing` e `architecture`.
-> **Revisão 5:** `groupId com.accord`, **SSO/OIDC na v1** (usuário real, não token estático), daemon em **8080 atrás de reverse proxy**, SQLite, retenção definida, regra "nada sensível no banco nem no log".
+> **Revisão 6:** primeiro plugin real é o **ReceitanetBX-Bot** (automação já existente, Java 23, CLI headless) → plugin é **adaptador de processo**; `groupId com.accord`, **SSO/OIDC na v1**, daemon em **8080 atrás de reverse proxy**, SQLite, retenção definida, regra "nada sensível no banco nem no log".
 
 ## Goal
 
@@ -38,6 +38,8 @@
 | D11 | Autenticação | **OIDC resource server**: JWT validado contra o JWKS do IdP, roles por claim, sem sessão e sem login próprio | identidade corporativa desde o início; o SIA nunca guarda senha de ninguém | token estático, tabela de usuários com senha |
 | D12 | Exposição | **`:8080` atrás de reverse proxy**; TLS termina no proxy; bind local no daemon | o proxy já existe — TLS e certificado não são problema do Core | TLS direto no Javalin |
 | D13 | Ordem da auth | **papéis + autorização + tokens de dev agora; OIDC quando o IdP for escolhido** | desbloqueia o resto do Core sem depender de tenant/app registration; `Authenticator` é a única peça que troca | esperar o IdP para tudo |
+| D14 | Primeiro plugin | **adaptador de processo** sobre o `ReceitanetBX-Bot.exe` | a automação é Java **23** (major 67) e o SIA roda em 21 — carregar in-process é impossível; o jpackage ainda removeu `java.exe`, sobrando só o `.exe`. O bot já expõe CLI headless completa | recompilar o bot para 21 / subir o SIA para 23 / arrastar um fat jar de 32 MB para dentro do plugin |
+| D15 | Execução de processo | `ProcessRunner` **no Core** (não `ProcessBuilder` no plugin), com allowlist de executável em config, timeout, saída limitada e permissão `EXEC_PROCESS` | plugin não escolhe o que executar; evita plugin virando shell | dar `ProcessBuilder` cru ao plugin |
 
 ## Contratos públicos (`sia-api`)
 
@@ -66,7 +68,25 @@ public record AutomationDescriptor(
 
 `ParamSpec.sensitive = true` é o que permite ao Core saber, sem disciplina do autor, o que jamais pode ir para log/banco. É a diferença entre política e convenção.
 
-Outros tipos: `PluginContext` (logger, config, storage, events, secrets, clock), `AutomationContext` (runId, **actor**, params, cancel, progress, storage, events), `AutomationResult` (status, outputsKeys, mensagem), `Parameters` imutável, `CancellationToken`, `RunId`, exceções (`PluginLoadException`, `PermissionDeniedException`, `AutomationException`, `CancellationRequested`).
+Outros tipos: `PluginContext` (log, config, storage, events, secrets, **processos**, clock), `AutomationContext` (runId, **actor**, params, cancel, progress, storage, events), `AutomationResult` (status, outputsKeys, mensagem), `Parameters` imutável, `CancellationToken`, `RunId`, exceções (`PluginLoadException`, `PermissionDeniedException`, `AutomationException`, `AutomationCancelledException`, `ConfigurationException`, `InvalidPluginException`).
+
+**Execução de processo (`ProcessRunner`)** — necessária para o primeiro plugin real:
+
+```java
+public interface ProcessRunner {
+  ProcessResult run(ProcessRequest request) throws ProcessException;   // timeout, saída limitada
+}
+
+public record ProcessRequest(
+    String executable,        // NOME LOGICO, resolvido pela allowlist do Core
+    List<String> arguments,
+    Duration timeout,
+    Map<String, String> environment) {}
+
+public record ProcessResult(int exitCode, String stdout, String stderr, Duration duration) {}
+```
+
+`executable` é **nome lógico** (`"receitanet-bx"`) mapeado em `config.yml` para o caminho real. O plugin nunca informa caminho de disco: se ele pudesse, a permissão `EXEC_PROCESS` viraria execução arbitrária. Saída é truncada em 256 KB e o Core redige valores dos parâmetros sensíveis antes de gravar.
 
 ## Ciclo de vida
 
@@ -168,18 +188,35 @@ ecac camila/
 
 ## Criar e validar um plugin — passo a passo
 
-1. `mvn archetype:generate -DarchetypeArtifactId=sia-plugin-archetype -DpluginId=email-automation` → esqueleto com `plugin.yml`, `pom.xml` (só `sia-api`), plugin, teste.
+1. `mvn archetype:generate -DarchetypeArtifactId=sia-plugin-archetype -DpluginId=receitanet-bx` → esqueleto com `plugin.yml`, `pom.xml` (só `sia-api`), plugin, teste.
 2. `plugin.yml`: `id` (minúsculo), `version` SemVer, `api-version: 1.0`, `main`, `permissions` mínimas.
 3. `AutomationPlugin`: `metadata()`, `automations()`, `initialize()`, `shutdown()`.
-4. Cada `Automation`: `id`, `execute` devolvendo `AutomationResult`; **marcar `ParamSpec.sensitive`** em senha, token, CPF, e-mail.
-5. Serviços só via contexto; sem `static` mutável, sem `System.out`, sem executor próprio.
+4. Cada `Automation`: `id`, `execute` devolvendo `AutomationResult`; **marcar `ParamSpec.sensitive`** em PIN, senha, token, CPF.
+5. Serviços só via contexto; sem `static` mutável, sem `System.out`, sem executor próprio, **sem `ProcessBuilder`** (use `ctx.processes()`).
 6. Testar com `PluginTestKit` (in-process, SQLite em temp, sem HTTP): caminho feliz + permissão negada + **nada sensível no log**.
 7. `mvn verify` no repo do plugin (teste de contrato herdado do archetype).
-8. `sia-cli plugins validate ./target/email-automation-1.0.0.jar` → 7 checagens (schema, id/versão, api-version, `main` implementa o contrato, permissões usadas × declaradas via `PermissionProbe`, dependências, smoke `initialize`→`shutdown`).
-9. `sia-cli plugins install ...` → `sia-cli plugins enable email-automation` → `sia-cli run email.send -p to=...` → `sia-cli runs` → `sia-cli logs <runId>`.
-10. Publicar: SemVer + CHANGELOG + SHA-256; tag `email-automation-v1.0.0`. (Assinatura/registry remoto: ADR futura, D9.)
+8. `sia-cli plugins validate ./target/receitanet-bx-1.0.0.jar` → 7 checagens (schema, id/versão, api-version, `main` implementa o contrato, permissões usadas × declaradas via `PermissionProbe`, dependências, smoke `initialize`→`shutdown`).
+9. `sia-cli plugins install ...` → `sia-cli plugins enable receitanet-bx` → `sia-cli run receitanet.lote -p arquivo=cnpjs.txt -p sistemas=1,13 -p inicio=01/01/2024 -p fim=31/01/2024` → `sia-cli runs` → `sia-cli logs <runId>`.
+10. Publicar: SemVer + CHANGELOG + SHA-256; tag `receitanet-bx-v1.0.0`. (Assinatura/registry remoto: ADR futura, D9.)
 
 **DoD do plugin:** manifesto válido · sem `static` mutável · permissões mínimas · `sensitive` marcado onde precisa · testes com TestKit (feliz + negado) · `validate` verde · `shutdown()` idempotente sem thread vazada · `mvn verify` verde.
+
+### Plugin real: `receitanet-bx` (adaptador de processo)
+
+O `ReceitanetBX-Bot` já é headless por CLI. O plugin é fino de propósito: monta comando, interpreta saída, devolve resultado. Nada de regra de negócio duplicada.
+
+| Automação | Comando do bot |
+|---|---|
+| `receitanet.diag` | `diag` (ambiente, banco Derby, certificados) |
+| `receitanet.catalogo` | `catalogo` (sincroniza sistemas/papéis) |
+| `receitanet.lote` | `lote-cnpj --arquivo --sistemas --inicio --fim [--baixar] [--limite-cnpjs] [--dry-run]` |
+| `receitanet.pedidos` | `pedidos --filtro --limite` |
+| `receitanet.pendentes` | `pendentes` |
+| `receitanet.baixar` | `baixar --pedido <id>` ou `baixar --todos` |
+
+Parâmetros: `arquivo` (caminho da lista), `sistemas` (CSV de ids), `inicio`/`fim` (`dd/MM/aaaa`, validadas **antes** de gerar processo), `baixar` (bool), `limiteCnpjs` (int), `dryRun` (bool) e **`pin` sensível** → nunca persistido, nunca em log, redigido da saída do processo.
+
+Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usam o **mesmo banco Derby** (só um abre por vez), e `--pin` aparece na lista de processos do Windows — por isso a recomendação é certificado no repositório do Windows (`--ni`) ou token PKCS#11, e não PIN na linha de comando.
 
 ---
 
@@ -209,8 +246,12 @@ ecac camila/
   → *Verificado:* `mvn -pl sia-auth -am test` = 17/17; `ADMIN` cobre todas as permissões varrendo o enum; claim desconhecido não escala privilégio.
 - [ ] **T11b — OIDC/JWKS (adiado por decisão)** · `security-auditor` — implementar o `Authenticator` OIDC: JWKS com cache por `kid`, `iss`/`aud`/`exp`, `sia-cli login` (code + PKCE loopback) e guarda de credencial `0600`. Só a autenticação muda; `Authorizer`, papéis e rotas ficam intactos.
   → *Verificar:* token ausente → 401; `viewer` em `POST /api/runs` → 403; assinatura inválida → 401; login completo contra Keycloak no CI.
-- [ ] **T12 — Exemplos + guia + hardening** · `documentation-writer` + `security-auditor` — 3 plugins (GreenMail, POI, Jsoup), `docs/PLUGIN_GUIDE.md`, ADRs D1–D12, deprecação SemVer, compatibilidade binária.
-  → *Verificar:* exemplos compilam só contra `api`+`testkit`; guia executável ponta a ponta; cobertura do core ≥ 80%.
+- [ ] **T4b — Execução de processo** · `security-auditor` / `vulnerability-scanner` — `ProcessRunner` no `sia-api`, `ProcessRequest`/`ProcessResult`, allowlist `processes.<nome>.path` na config, permissão `EXEC_PROCESS`, timeout, saída limitada a 256 KB, redaction dos parametros sensiveis na captura, kill em cascata no cancelamento.
+  → *Verificar:* plugin sem `EXEC_PROCESS` → `PermissionDeniedException`; executável fora da allowlist → erro antes de subir processo; `sleep.py` de 10s com timeout 1s é morto (sem processo órfão); `--pin` não aparece na saída persistida.
+- [ ] **T13 — Plugin `receitanet-bx`** · `backend-specialist` + `test-engineer` — 6 automações da tabela acima, validação de data antes do processo, parser de saída com `errorCode` estavel, `pin` sensível, `plugin.yml` com `permissions: [process]`, testes com processo fake (`ProcessRunner` stub) + integração real opt-in (`-Dsia.receitanet.path=...`).
+  → *Verificar:* `receitanet.diag` contra o bot instalado devolve `SUCCESS` com contagem de sistemas; `lote` com data `31/04` falha em < 1s sem subir processo; saída com PIN é redigida.
+- [ ] **T12 — Guia + segundo exemplo + hardening** · `documentation-writer` + `security-auditor` — `docs/PLUGIN_GUIDE.md` usando o `receitanet-bx` como caso real, um segundo plugin mínimo (sem dependências de e-mail/planilha), ADRs D1–D15, deprecação SemVer, compatibilidade binária.
+  → *Verificar:* guia executado ponta a ponta pelo time; exemplo mínimo compila só contra `api`+`testkit`; cobertura do core ≥ 80%.
 
 ## Riscos
 
@@ -226,11 +267,17 @@ ecac camila/
 | `URLClassLoader` vaza thread/recurso no unload | Alto | `close()` obrigatório + teste de leak |
 | Restart do daemon no meio de um run | Médio | `run` órfã marcada `INTERRUPTED` na subida; workflow retoma por nó |
 | Escopo inflar (UI, registry remoto, assinatura) antes do Core | Alto | D9 adiada por decisão; registry só quando o servidor de plugins existir |
+| Processo filho esquecido (órfão) ou PID vazado | Alto | `ProcessRunner` mata a árvore no timeout e no cancelamento; teste com `sleep` |
+| `--pin` do certificado visível na linha de comando | Médio | preferir certificado no repositório do Windows (`--ni`) ou PKCS#11; documentar o residual |
+| Bot x Receitanet oficial no mesmo banco Derby | Médio | lock de instância já existe no bot; plugin reporta `XSDB6`/`42818` como `errorCode` estável |
+| Plugin exigir Windows (jpackage/ICP-Brasil) | Médio | `requiresOs` no manifesto; plugin falha com mensagem clara fora do Windows em vez de erro obscuro |
 
 ## Em aberto
 
 1. **IdP**: adiado por decisão — quando definir, preciso de `issuer`, `audience` e se o tenant tem App Roles (senão, mapa de `groups` → papel).
 2. **App registration**: quem cria o app do SIA no IdP (redirect `http://127.0.0.1:*`, escopo `api://sia/.default`)?
+3. **Caminho do bot**: o `receitanet-bx` vai ficar em `automacao/ReceitanetBX-Bot` no servidor, ou o plugin deve receber o caminho por config (`processes.receitanet.path`)?
+4. **PIN do certificado**: o time usa certificado A1/token com PIN, ou da para operar com o certificado do repositório do Windows (sem `--pin`)?
 
 ## Phase X — Verificação final
 

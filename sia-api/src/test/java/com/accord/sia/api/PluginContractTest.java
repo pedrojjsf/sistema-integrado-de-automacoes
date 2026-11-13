@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class PluginContractTest {
 
   private static final PluginMetadata GOOD_METADATA =
-      new PluginMetadata("email-automation", "Email Automation", "1.0.0", "1.0", "Accord");
+      new PluginMetadata("receitanet-bx", "Receitanet BX", "1.0.0", "1.0", "Accord");
 
   private static AutomationPlugin pluginOf(
       PluginMetadata metadata, List<AutomationDescriptor> descriptors) {
@@ -32,31 +32,31 @@ class PluginContractTest {
     };
   }
 
-  private static AutomationDescriptor sendEmail() {
+  private static AutomationDescriptor loteCnpj() {
     return AutomationDescriptor.of(
-        "email.send",
-        "Enviar e-mail",
-        "Envia mensagem",
+        "receitanet.lote",
+        "Lote por CNPJ",
+        "Cria e baixa pedidos por CNPJ",
         List.of(
-            ParamSpec.required("to", ParamType.STRING, "destinatario"),
-            ParamSpec.optional("smtpPassword", ParamType.STRING, "senha SMTP").asSensitive()));
+            ParamSpec.required("arquivo", ParamType.STRING, "lista de CNPJs"),
+            ParamSpec.optional("pin", ParamType.STRING, "PIN do certificado").asSensitive()));
   }
 
   @Test
   void aceitaPluginValido() throws InvalidPluginException {
-    PluginContract.validate(pluginOf(GOOD_METADATA, List.of(sendEmail())));
+    PluginContract.validate(pluginOf(GOOD_METADATA, List.of(loteCnpj())));
   }
 
   @Test
   void rejeitaMetadataNulo() {
-    assertThatThrownBy(() -> PluginContract.validate(pluginOf(null, List.of(sendEmail()))))
+    assertThatThrownBy(() -> PluginContract.validate(pluginOf(null, List.of(loteCnpj()))))
         .isInstanceOfSatisfying(
             InvalidPluginException.class, error -> assertThat(error.field()).isEqualTo("metadata"));
   }
 
   @Test
   void rejeitaIdDePluginComMaiuscula() {
-    var metadata = new PluginMetadata("Email-Automation", "Email", "1.0.0", "1.0");
+    var metadata = new PluginMetadata("Receitanet-BX", "Receitanet BX", "1.0.0", "1.0");
 
     assertThatThrownBy(() -> PluginContract.validate(metadata))
         .isInstanceOfSatisfying(
@@ -66,7 +66,7 @@ class PluginContractTest {
 
   @Test
   void rejeitaVersaoForaDeSemver() {
-    var metadata = new PluginMetadata("email-automation", "Email", "1.0", "1.0");
+    var metadata = new PluginMetadata("receitanet-bx", "Receitanet BX", "1.0", "1.0");
 
     assertThatThrownBy(() -> PluginContract.validate(metadata))
         .isInstanceOfSatisfying(
@@ -76,7 +76,7 @@ class PluginContractTest {
 
   @Test
   void rejeitaApiVersionIncompativel() {
-    var metadata = new PluginMetadata("email-automation", "Email", "1.0.0", "2.0");
+    var metadata = new PluginMetadata("receitanet-bx", "Receitanet BX", "1.0.0", "2.0");
 
     assertThatThrownBy(() -> PluginContract.validate(metadata))
         .isInstanceOfSatisfying(
@@ -94,15 +94,15 @@ class PluginContractTest {
 
   @Test
   void rejeitaAutomacaoDuplicada() {
-    assertThatThrownBy(() -> PluginContract.validateAutomations(List.of(sendEmail(), sendEmail())))
+    assertThatThrownBy(() -> PluginContract.validateAutomations(List.of(loteCnpj(), loteCnpj())))
         .isInstanceOfSatisfying(
             InvalidPluginException.class,
-            error -> assertThat(error.field()).contains("email.send"));
+            error -> assertThat(error.field()).contains("receitanet.lote"));
   }
 
   @Test
   void rejeitaIdDeAutomacaoSemFormatoPluginAcao() {
-    var descriptor = AutomationDescriptor.of("send", "Enviar", "sem prefixo");
+    var descriptor = AutomationDescriptor.of("send", "Lote por CNPJ", "sem prefixo");
 
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(
@@ -113,7 +113,7 @@ class PluginContractTest {
   @Test
   void rejeitaParametroSensivelComValorPadrao() {
     var spec = ParamSpec.optional("token", ParamType.STRING, "token", "abc").asSensitive();
-    var descriptor = AutomationDescriptor.of("email.send", "Enviar", "desc", List.of(spec));
+    var descriptor = AutomationDescriptor.of("receitanet.lote", "Lote por CNPJ", "desc", List.of(spec));
 
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(
@@ -124,8 +124,8 @@ class PluginContractTest {
   void rejeitaParametroDuplicado() {
     var descriptor =
         AutomationDescriptor.of(
-            "email.send",
-            "Enviar",
+            "receitanet.lote",
+            "Lote por CNPJ",
             "desc",
             List.of(
                 ParamSpec.required("to", ParamType.STRING, "a"),
@@ -134,7 +134,7 @@ class PluginContractTest {
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(
             InvalidPluginException.class,
-            error -> assertThat(error.field()).contains("email.send"));
+            error -> assertThat(error.field()).contains("receitanet.lote"));
   }
 
   @Test
