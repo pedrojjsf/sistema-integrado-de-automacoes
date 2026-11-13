@@ -18,7 +18,7 @@ import java.util.List;
 public final class SchemaMigrator {
 
   private static final List<String> SCRIPTS =
-      List.of("/schema/V1__init.sql", "/schema/V2__run_details.sql");
+      List.of("/schema/V1__init.sql", "/schema/V2__run_details.sql", "/schema/V3__idempotency.sql");
 
   public void migrate(Database database) {
     try (Connection connection = database.connection()) {

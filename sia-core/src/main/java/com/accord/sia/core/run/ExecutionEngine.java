@@ -47,6 +47,7 @@ public final class ExecutionEngine implements AutoCloseable {
   private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
   private final Map<String, Semaphore> bulkheads = new ConcurrentHashMap<>();
   private final Map<String, DefaultCancellationToken> running = new ConcurrentHashMap<>();
+  private final RunEventBus events;
 
   public ExecutionEngine(
       RunRepository repository,
@@ -54,6 +55,17 @@ public final class ExecutionEngine implements AutoCloseable {
       int permitsPerPlugin,
       Duration queueWait,
       Duration defaultTimeout) {
+    this(repository, clock, permitsPerPlugin, queueWait, defaultTimeout, new RunEventBus());
+  }
+
+  public ExecutionEngine(
+      RunRepository repository,
+      Clock clock,
+      int permitsPerPlugin,
+      Duration queueWait,
+      Duration defaultTimeout,
+      RunEventBus events) {
+    this.events = events;
     this.repository = repository;
     this.clock = clock;
     this.permitsPerPlugin = Math.max(1, permitsPerPlugin);
@@ -68,9 +80,14 @@ public final class ExecutionEngine implements AutoCloseable {
 
   /** Registra a execucao e devolve o id imediatamente; o trabalho roda em background. */
   public RunId submit(PluginRuntime plugin, RunRequest request) {
-    Prepared prepared = prepare(plugin, request);
+    return submit(plugin, request, RunId.generate());
+  }
+
+  /** Variante usada pela idempotencia: o id e definido antes de disparar. */
+  public RunId submit(PluginRuntime plugin, RunRequest request, RunId runId) {
+    Prepared prepared = prepare(plugin, request, runId);
     executor.submit(() -> run(prepared, request));
-    return prepared.runId();
+    return runId;
   }
 
   public boolean cancel(RunId runId) {
@@ -117,6 +134,10 @@ public final class ExecutionEngine implements AutoCloseable {
       PluginContext services) {}
 
   private Prepared prepare(PluginRuntime plugin, RunRequest request) {
+    return prepare(plugin, request, RunId.generate());
+  }
+
+  private Prepared prepare(PluginRuntime plugin, RunRequest request, RunId runId) {
     if (plugin.state() != PluginState.ENABLED) {
       throw new IllegalStateException(
           "plugin " + plugin.id() + " nao esta ENABLED (estado: " + plugin.state() + ")");
@@ -124,13 +145,13 @@ public final class ExecutionEngine implements AutoCloseable {
     Automation automation = findAutomation(plugin, request.automationId());
     AutomationDescriptor descriptor = automation.describe();
     Redactor redactor = redactorOf(descriptor, request.params());
-    RunId runId =
-        repository.start(
-            plugin.id(),
-            descriptor.id(),
-            request.actor(),
-            request.trigger(),
-            request.params().names());
+    repository.start(
+        runId,
+        plugin.id(),
+        descriptor.id(),
+        request.actor(),
+        request.trigger(),
+        request.params().names());
     return new Prepared(runId, plugin.id(), automation, descriptor, redactor, plugin.context());
   }
 
@@ -166,8 +187,8 @@ public final class ExecutionEngine implements AutoCloseable {
               prepared.descriptor().id(),
               request.actor(),
               request.params(),
-              new RunLog(repository, redactor, runId, prepared.pluginId()),
-              new RunProgress(repository, redactor, runId),
+              new RunLog(repository, redactor, runId, prepared.pluginId(), events),
+              new RunProgress(repository, redactor, runId, events),
               cancellation,
               services.storage(),
               services.events(),
@@ -206,6 +227,7 @@ public final class ExecutionEngine implements AutoCloseable {
 
     String safeMessage = redactor.redact(message);
     repository.finish(runId, status, errorCode, safeMessage, outputs.keySet());
+    events.publish(RunEvent.finished(runId.value(), status.name(), Instant.now()));
     return new RunOutcome(
         runId, status, errorCode, safeMessage, outputs, Duration.between(started, clock.instant()));
   }

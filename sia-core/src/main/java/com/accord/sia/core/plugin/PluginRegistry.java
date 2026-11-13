@@ -22,6 +22,10 @@ public final class PluginRegistry {
     }
   }
 
+  public Optional<LoadedPlugin> remove(String id) {
+    return Optional.ofNullable(plugins.remove(id));
+  }
+
   public Optional<LoadedPlugin> find(String id) {
     return Optional.ofNullable(plugins.get(id));
   }

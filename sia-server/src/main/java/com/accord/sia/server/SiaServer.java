@@ -2,8 +2,10 @@ package com.accord.sia.server;
 
 import com.accord.sia.api.Actor;
 import com.accord.sia.api.AutomationDescriptor;
+import com.accord.sia.api.InvalidPluginException;
 import com.accord.sia.api.ParamSpec;
 import com.accord.sia.api.Parameters;
+import com.accord.sia.api.PluginLoadException;
 import com.accord.sia.api.RunId;
 import com.accord.sia.auth.AuthorizationException;
 import com.accord.sia.auth.Authorizer;
@@ -111,10 +113,17 @@ public final class SiaServer implements AutoCloseable {
     app.get("/api/plugins/{id}", this::plugin);
     app.get("/api/automations", this::automations);
     app.post("/api/runs", this::createRun);
+    app.get("/api/runs/{id}/events", this::events);
     app.get("/api/runs", this::runs);
     app.get("/api/runs/{id}", this::run);
     app.get("/api/runs/{id}/logs", this::logs);
     app.post("/api/runs/{id}/cancel", this::cancel);
+    app.post("/api/plugins/validate", this::validatePlugin);
+    app.post("/api/plugins/install", this::installPlugin);
+    app.post("/api/plugins/{id}/enable", ctx -> changeState(ctx, true));
+    app.post("/api/plugins/{id}/disable", ctx -> changeState(ctx, false));
+    app.post("/api/plugins/{id}/reload", this::reloadPlugin);
+    app.get("/openapi.yaml", this::openapi);
 
     app.exception(
         AuthorizationException.class,
@@ -229,7 +238,13 @@ public final class SiaServer implements AutoCloseable {
     Actor actor = Actor.user(principal.subject(), principal.displayName());
     Parameters params = Parameters.of(payload.params() == null ? Map.of() : payload.params());
 
-    RunId runId = core.submit(payload.automation(), params, actor, RunRequestPayload.TRIGGER_API);
+    String idempotencyKey = ctx.header("Idempotency-Key");
+    RunId runId =
+        core.submit(
+            payload.automation(), params, actor, RunRequestPayload.TRIGGER_API, idempotencyKey);
+    if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+      ctx.header("Idempotent-Replay", "true");
+    }
     ctx.status(202).json(Map.of("runId", runId.value()));
   }
 
@@ -254,6 +269,94 @@ public final class SiaServer implements AutoCloseable {
   private void cancel(Context ctx) {
     boolean cancelled = core.cancel(runId(ctx));
     ctx.json(Map.of("cancelled", cancelled));
+  }
+
+  private void events(Context ctx) {
+    RunId runId = runId(ctx);
+    core.run(runId)
+        .orElseThrow(() -> new IllegalArgumentException("execucao desconhecida: " + runId));
+    ctx.header("Content-Type", "text/event-stream");
+    ctx.header("Cache-Control", "no-cache");
+    ctx.header("X-Accel-Buffering", "no");
+    try {
+      java.io.OutputStream output = ctx.res().getOutputStream();
+      java.util.concurrent.atomic.AtomicBoolean closed =
+          new java.util.concurrent.atomic.AtomicBoolean();
+      try (AutoCloseable subscription =
+          core.runEvents()
+              .subscribe(
+                  runId.value(),
+                  event -> {
+                    if (closed.get()) {
+                      return;
+                    }
+                    try {
+                      SseWriter.write(output, event);
+                    } catch (java.io.IOException error) {
+                      closed.set(true);
+                    }
+                  })) {
+        SseWriter.frame(output, "ready", "{}");
+        long deadline = System.nanoTime() + 600_000_000_000L;
+        while (!closed.get() && System.nanoTime() < deadline) {
+          RunRecord record = core.run(runId).orElseThrow();
+          if (record.status().isFinished()) {
+            SseWriter.finished(output, record.status().name());
+            break;
+          }
+          SseWriter.frame(output, "ping", "{}");
+          Thread.sleep(500);
+        }
+      }
+    } catch (java.lang.Exception error) {
+      if (error instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private void validatePlugin(Context ctx) throws java.io.IOException, InvalidPluginException {
+    String path = ctx.bodyAsClass(PluginPathPayload.class).path();
+    var validation = core.validatePlugin(java.nio.file.Path.of(path));
+    ctx.json(
+        Map.of(
+            "id", validation.id(),
+            "version", validation.version(),
+            "kind", validation.kind(),
+            "mainClassPresent", validation.mainClassPresent()));
+  }
+
+  private void installPlugin(Context ctx)
+      throws java.io.IOException, InvalidPluginException, PluginLoadException {
+    String path = ctx.bodyAsClass(PluginPathPayload.class).path();
+    var plugin = core.installPlugin(java.nio.file.Path.of(path));
+    ctx.status(201).json(pluginView(plugin));
+  }
+
+  private void changeState(Context ctx, boolean enable) {
+    String id = ctx.pathParam("id");
+    if (enable) {
+      core.enablePlugin(id);
+    } else {
+      core.disablePlugin(id);
+    }
+    ctx.json(pluginView(core.plugin(id).orElseThrow()));
+  }
+
+  private void reloadPlugin(Context ctx)
+      throws java.io.IOException, InvalidPluginException, PluginLoadException {
+    var plugin = core.reloadPlugin(ctx.pathParam("id"));
+    ctx.json(pluginView(plugin));
+  }
+
+  private void openapi(Context ctx) throws java.io.IOException {
+    ctx.contentType("application/yaml");
+    ctx.result(
+        SiaServer.class.getResourceAsStream("/openapi.yaml") == null
+            ? "openapi: 3.0.3"
+            : new String(
+                SiaServer.class.getResourceAsStream("/openapi.yaml").readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8));
   }
 
   private static RunId runId(Context ctx) {
@@ -288,6 +391,9 @@ public final class SiaServer implements AutoCloseable {
       return fallback;
     }
   }
+
+  /** Corpo dos endpoints de plugin. */
+  public record PluginPathPayload(String path) {}
 
   /** Corpo do {@code POST /api/runs}. */
   public record RunRequestPayload(String automation, Map<String, Object> params) {

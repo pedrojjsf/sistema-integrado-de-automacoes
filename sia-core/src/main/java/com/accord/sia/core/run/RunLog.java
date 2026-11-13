@@ -18,12 +18,19 @@ public final class RunLog implements Log {
   private final Redactor redactor;
   private final RunId runId;
   private final Logger logger;
+  private final RunEventBus events;
 
-  public RunLog(RunRepository repository, Redactor redactor, RunId runId, String pluginId) {
+  public RunLog(
+      RunRepository repository,
+      Redactor redactor,
+      RunId runId,
+      String pluginId,
+      RunEventBus events) {
     this.repository = repository;
     this.redactor = redactor;
     this.runId = runId;
     this.logger = LoggerFactory.getLogger("sia.run." + pluginId);
+    this.events = events;
   }
 
   @Override
@@ -59,6 +66,7 @@ public final class RunLog implements Log {
   private void write(String level, String message, String eventCode) {
     String safe = redactor.redact(message == null ? "" : message);
     repository.appendLog(runId, level, eventCode, safe);
+    events.publish(RunEvent.log(runId.value(), level, safe, java.time.Instant.now()));
     MDC.put("runId", runId.value());
     try {
       switch (level) {

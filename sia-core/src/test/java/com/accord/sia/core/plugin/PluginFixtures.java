@@ -22,22 +22,23 @@ import javax.tools.ToolProvider;
  * estivessem no classpath do teste, o pai do classloader do plugin as encontraria e o teste de
  * isolamento passaria sem provar nada.
  */
-final class PluginFixtures {
+public final class PluginFixtures {
 
   private static final Path SOURCE_ROOT = Path.of("src", "test", "resources", "plugin-fixtures");
 
   private PluginFixtures() {}
 
   /** Compila a fixture e devolve o diretorio de plugin pronto (plugin.yml + plugin.jar). */
-  static Path packagePlugin(Path workDirectory, String fixture, Path pluginsDirectory)
+  public static Path packagePlugin(Path workDirectory, String fixture, Path pluginsDirectory)
       throws IOException {
     Path fixtureRoot = SOURCE_ROOT.resolve(fixture);
     Path classes = Files.createDirectories(workDirectory.resolve("classes").resolve(fixture));
     Path target = Files.createDirectories(pluginsDirectory.resolve(fixture));
 
     compile(fixtureRoot, classes);
-    jar(classes, target.resolve("plugin.jar"));
-    Files.copy(fixtureRoot.resolve("plugin.yml"), target.resolve("plugin.yml"));
+    Path manifest = fixtureRoot.resolve("plugin.yml");
+    jar(classes, target.resolve("plugin.jar"), manifest);
+    Files.copy(manifest, target.resolve("plugin.yml"));
     return target;
   }
 
@@ -76,10 +77,13 @@ final class PluginFixtures {
     }
   }
 
-  private static void jar(Path classes, Path jarFile) throws IOException {
+  private static void jar(Path classes, Path jarFile, Path manifest) throws IOException {
     try (OutputStream out = Files.newOutputStream(jarFile);
         JarOutputStream jar = new JarOutputStream(out);
         Stream<Path> files = Files.walk(classes)) {
+      jar.putNextEntry(new JarEntry("plugin.yml"));
+      jar.write(Files.readAllBytes(manifest));
+      jar.closeEntry();
       for (Path file : files.filter(Files::isRegularFile).toList()) {
         String entry = classes.relativize(file).toString().replace('\\', '/');
         jar.putNextEntry(new JarEntry(entry));

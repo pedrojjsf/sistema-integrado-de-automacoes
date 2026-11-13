@@ -39,7 +39,16 @@ public final class RunRepository {
       Actor actor,
       String trigger,
       Collection<String> paramsKeys) {
-    RunId runId = RunId.generate();
+    return start(RunId.generate(), pluginId, automationId, actor, trigger, paramsKeys);
+  }
+
+  public RunId start(
+      RunId runId,
+      String pluginId,
+      String automationId,
+      Actor actor,
+      String trigger,
+      Collection<String> paramsKeys) {
     long now = clock.millis();
     String sql =
         """
