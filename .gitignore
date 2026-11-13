@@ -1,0 +1,23 @@
+# build
+target/
+*.class
+
+# runtime data (SQLite, plugins instalados, logs)
+data/
+plugins/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# segredos
+.env
+.env.*
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
