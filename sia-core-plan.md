@@ -284,6 +284,26 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
 - [ ] **T12 — Guia + segundo exemplo + hardening** · `documentation-writer` + `security-auditor` — `docs/PLUGIN_GUIDE.md` usando o `receitanet-bx` como caso real, um segundo plugin mínimo (sem dependências de e-mail/planilha), ADRs D1–D15, deprecação SemVer, compatibilidade binária.
   → *Verificar:* guia executado ponta a ponta pelo time; exemplo mínimo compila só contra `api`+`testkit`; cobertura do core ≥ 80%.
 
+### Ordem sugerida para concluir esta parte
+
+```
+T8  →  T9  →  T4c  →  T11b  →  T12
+```
+
+| Ordem | Task | Por que agora | Bloqueio |
+|---|---|---|---|
+| 1º | **T8 — Workflow (DAG)** | é o que transforma "executor de automações" em plataforma: encadear `baixar → classificar → mover` com retomada por nó. Reusa engine, schedule e eventos já prontos | nenhum |
+| 2º | **T9 — Archetype + TestKit** | só faz sentido depois do workflow, porque o `PluginTestKit` precisa conseguir testar um plugin dentro de um passo de workflow; e antes de o time começar a escrever plugins em série | T8 (para o harness completo) |
+| 3º | **T4c — Host de plugin `process`** | completa a promessa do manifesto (`kind: process`). Nada hoje depende disso, mas prometer dois modos e entregar um é dívida aberta | nenhum |
+| 4º | **T11b — OIDC/JWKS** | quando o IdP existir. O `Authenticator` é a única peça que troca; papéis, rotas e testes ficam intactos | decisão do IdP |
+| 5º | **T12 — Guia + hardening** | fecha o ciclo: `docs/PLUGIN_GUIDE.md` com o receitanet como caso real, segundo exemplo mínimo, cobertura ≥ 80%, ADRs restantes | T8/T9 (guia cita workflow e testkit) |
+
+**Se T11b destravar antes** (IdP escolhido), ela pode entrar em qualquer ponto entre T9 e T12 — não depende de código novo, só de configuração e de um tenant.
+
+**Se o time for começar a escrever plugins antes da T8**, inverta T9 e T8: o TestKit é o que destrava outras pessoas, e ele não depende do workflow para o caso simples (plugin → automação → asserção).
+
+Depois da T12 esta parte do projeto está fechada. O que fica fora, por decisão registrada: registry remoto com assinatura de plugin (D9), UI web e execução multi-máquina.
+
 ## Riscos
 
 | Risco | Impacto | Mitigação |
