@@ -111,6 +111,24 @@ O SIA é **resource server**, não provedor de identidade: não tem tela de logi
 - **CLI**: `sia-cli login` usa **Authorization Code + PKCE** com redirect em loopback (`127.0.0.1:<porta efêmera>`), abre o navegador para o IdP e guarda o refresh token em `~/.sia/credentials.json` (permissão `0600`; no Windows, ACL do usuário). `--dev-token` só é aceito com `auth.mode=dev` em config, nunca por padrão.
 - Modo `dev` (sem IdP, para destravar o time): token estático local, explicitamente marcado no `/api/health` como `"auth":"dev"`.
 
+**O que o SIA precisa do IdP** (4 valores, nada mais): `issuer` · `jwks_uri` (vem do `/.well-known/openid-configuration`) · `audience`/client-id do app registrado · nome do claim de papéis + mapa valor→papel. O SIA nunca fala com o diretório do IdP; só busca chaves públicas e valida assinatura localmente.
+
+**Claim de papéis — por que não usar `groups` de primeira:** no Entra ID `groups` devolve **GUID** de grupo (não nome), estoura em tenant grande (`_claim_names` com overage, exigindo chamada ao Graph) e pode inchar o JWT até o proxy recusar por header grande. O caminho certo é **App Role** (Entra) ou role de client/realm (Keycloak) com nomes curtos e estáveis — ex.: `sia.viewer`, `sia.operator`, `sia.admin`. `groups` fica como fallback configurável:
+
+```yaml
+auth:
+  mode: oidc              # oidc | dev
+  issuer: https://login.microsoftonline.com/<tenant>/v2.0
+  audience: api://sia
+  jwks: { ttl: 1h }
+  roles:
+    claim: roles          # ou groups
+    map: { "sia.viewer": sia.viewer, "sia.operator": sia.operator, "sia.admin": sia.admin }
+    default: none         # deny-by-default
+```
+
+**Modo `dev`** (confirmado): liberado na máquina do analista, bloqueado quando `env=prod`, anunciado no `/api/health` como `"auth":"dev"` e com warning no log de subida.
+
 **Regras do daemon:** bind `127.0.0.1:8080` (o proxy fala com ele; abrir direto para a rede exige config explícita), confiar em `X-Forwarded-For/-Proto` **somente** do IP do proxy, `Idempotency-Key` no `POST /api/runs` (retry do cliente não duplica execução), **nunca logar corpo de requisição nem header de Authorization**, `graceful shutdown` em SIGTERM/interrupt (para scheduler, cancela runs, `shutdown()` de plugins, fecha o banco), instância única por lock file + porta.
 
 ## Persistência SQLite e retenção
@@ -208,9 +226,9 @@ ecac camila/
 
 ## Em aberto
 
-1. **Qual IdP?** (Entra ID, Keycloak, Okta, Google Workspace) — define claim de papéis e se o `code + PKCE` em loopback é permitido no tenant.
-2. **Claim de papéis**: `groups` serve, ou o IdP expõe `roles`/`app_roles`?
-3. **Modo `dev`**: liberado na máquina do analista e bloqueado quando `env=prod` — confirma?
+1. **Qual IdP?** (Entra ID, Keycloak, Okta, Google Workspace) — define `issuer`, `audience`, claim de papéis e se `code + PKCE` em loopback é permitido no tenant.
+2. **Claim de papéis**: existem App Roles (`roles`) ou só `groups`? Se só `groups`, preciso do mapa GUID → papel.
+3. **App registration**: quem cria o app no IdP (nome, redirect `http://127.0.0.1:*`, escopo `api://sia/.default`)?
 
 ## Phase X — Verificação final
 
