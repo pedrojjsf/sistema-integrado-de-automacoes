@@ -37,6 +37,7 @@
 | D10 | Portabilidade | nenhum código específico de SO; `java.nio` para caminhos; sem shell-out | vai rodar em Linux no servidor | atalhos Windows |
 | D11 | Autenticação | **OIDC resource server**: JWT validado contra o JWKS do IdP, roles por claim, sem sessão e sem login próprio | identidade corporativa desde o início; o SIA nunca guarda senha de ninguém | token estático, tabela de usuários com senha |
 | D12 | Exposição | **`:8080` atrás de reverse proxy**; TLS termina no proxy; bind local no daemon | o proxy já existe — TLS e certificado não são problema do Core | TLS direto no Javalin |
+| D13 | Ordem da auth | **papéis + autorização + tokens de dev agora; OIDC quando o IdP for escolhido** | desbloqueia o resto do Core sem depender de tenant/app registration; `Authenticator` é a única peça que troca | esperar o IdP para tudo |
 
 ## Contratos públicos (`sia-api`)
 
@@ -204,8 +205,10 @@ ecac camila/
   → *Verificar:* archetype gera projeto que compila e passa `mvn verify` sem edição; TestKit < 20s.
 - [ ] **T10 — Daemon + REST + CLI cliente** · `backend-specialist` + `devops-engineer` / `deployment-procedures` — Javalin em `127.0.0.1:8080`, rotas, idempotência, SSE de progresso, graceful shutdown, lock de instância, `openapi.yaml`; picocli: `plugins`, `run`, `runs`, `logs`, `workflow`, `doctor`.
   → *Verificar:* `/api/health` 200; `run` com mesma `Idempotency-Key` duas vezes = 1 execução; `kill -TERM` desliga limpo sem run órfã; `X-Forwarded-For` só é aceito do IP do proxy.
-- [ ] **T11 — Auth SSO/OIDC** · `security-auditor` / `vulnerability-scanner` — `sia-auth`: JWKS com cache por `kid`, validação de assinatura/`iss`/`aud`/`exp`, mapeamento claim → papel, `Policy` por rota; modo `dev` isolado; `sia-cli login` (code + PKCE em loopback) e guarda de credencial com `0600`.
-  → *Verificar:* token ausente → 401 com `WWW-Authenticate`; token de `viewer` chamando `POST /api/runs` → 403; token assinado com chave errada → 401; `sia-cli login` completo contra IdP de teste (Keycloak no CI); `auth.mode=dev` marcado no health e proibido quando `env=prod`.
+- [x] **T11 — Papéis e autorização** · `security-auditor` — `SiaRole` (VIEWER/OPERATOR/ADMIN → permissões), `Principal` (user/system), `RoleMapping` (App Roles + fallback para GUID de grupo), `Authorizer` (401/403), `DevTokens` (comparação em tempo constante, proibido em `prod`). **17 testes verdes.**
+  → *Verificado:* `mvn -pl sia-auth -am test` = 17/17; `ADMIN` cobre todas as permissões varrendo o enum; claim desconhecido não escala privilégio.
+- [ ] **T11b — OIDC/JWKS (adiado por decisão)** · `security-auditor` — implementar o `Authenticator` OIDC: JWKS com cache por `kid`, `iss`/`aud`/`exp`, `sia-cli login` (code + PKCE loopback) e guarda de credencial `0600`. Só a autenticação muda; `Authorizer`, papéis e rotas ficam intactos.
+  → *Verificar:* token ausente → 401; `viewer` em `POST /api/runs` → 403; assinatura inválida → 401; login completo contra Keycloak no CI.
 - [ ] **T12 — Exemplos + guia + hardening** · `documentation-writer` + `security-auditor` — 3 plugins (GreenMail, POI, Jsoup), `docs/PLUGIN_GUIDE.md`, ADRs D1–D12, deprecação SemVer, compatibilidade binária.
   → *Verificar:* exemplos compilam só contra `api`+`testkit`; guia executável ponta a ponta; cobertura do core ≥ 80%.
 
@@ -226,15 +229,15 @@ ecac camila/
 
 ## Em aberto
 
-1. **Qual IdP?** (Entra ID, Keycloak, Okta, Google Workspace) — define `issuer`, `audience`, claim de papéis e se `code + PKCE` em loopback é permitido no tenant.
-2. **Claim de papéis**: existem App Roles (`roles`) ou só `groups`? Se só `groups`, preciso do mapa GUID → papel.
-3. **App registration**: quem cria o app no IdP (nome, redirect `http://127.0.0.1:*`, escopo `api://sia/.default`)?
+1. **IdP**: adiado por decisão — quando definir, preciso de `issuer`, `audience` e se o tenant tem App Roles (senão, mapa de `groups` → papel).
+2. **App registration**: quem cria o app do SIA no IdP (redirect `http://127.0.0.1:*`, escopo `api://sia/.default`)?
 
 ## Phase X — Verificação final
 
 ```bash
 ./mvnw -q clean verify
-./mvnw -q -pl sia-auth,sia-server test -Dtest=JwtValidationTest,RolePolicyTest,ApiContractTest,IdempotencyTest,GracefulShutdownTest
+./mvnw -q -pl sia-auth test -Dtest=RoleMappingTest,AuthorizerTest,DevTokensTest
+./mvnw -q -pl sia-server test -Dtest=ApiContractTest,IdempotencyTest,GracefulShutdownTest
 java -jar sia-server/target/sia-server.jar --config config/local.yml &
 curl -s localhost:8080/api/health
 TOKEN=$(./sia-cli login --print-token)   # ou token do IdP
