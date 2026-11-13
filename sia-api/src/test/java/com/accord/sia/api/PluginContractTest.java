@@ -113,7 +113,8 @@ class PluginContractTest {
   @Test
   void rejeitaParametroSensivelComValorPadrao() {
     var spec = ParamSpec.optional("token", ParamType.STRING, "token", "abc").asSensitive();
-    var descriptor = AutomationDescriptor.of("receitanet.lote", "Lote por CNPJ", "desc", List.of(spec));
+    var descriptor =
+        AutomationDescriptor.of("receitanet.lote", "Lote por CNPJ", "desc", List.of(spec));
 
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(

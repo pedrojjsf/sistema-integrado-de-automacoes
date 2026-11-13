@@ -2,7 +2,7 @@
 
 > Plano de implementação (modo PLANNING — só andaime de build escrito até agora).
 > `@project-planner` + skills `plan-writing` e `architecture`.
-> **Revisão 6:** primeiro plugin real é o **ReceitanetBX-Bot** (automação já existente, Java 23, CLI headless) → plugin é **adaptador de processo**; `groupId com.accord`, **SSO/OIDC na v1**, daemon em **8080 atrás de reverse proxy**, SQLite, retenção definida, regra "nada sensível no banco nem no log".
+> **Revisão 7:** SIA migrado para **Java 23** (alinhado ao bot); primeiro plugin real é o **ReceitanetBX-Bot** (automação existente, CLI headless) → plugin é **adaptador de processo**; `groupId com.accord`, **SSO/OIDC na v1**, daemon em **8080 atrás de reverse proxy**, SQLite, retenção definida, regra "nada sensível no banco nem no log".
 
 ## Goal
 
@@ -14,18 +14,19 @@
 
 | Item | Estado | Observação |
 |---|---|---|
-| JDK 21 | `...\jdks\jdk-21.0.12\jdk-21.0.12` | `JAVA_HOME` (usuário) aponta para cá |
+| JDK 23 | `...\jdks\jdk-23.0.2` | `JAVA_HOME` (usuário) aponta para cá; o projeto exige 23 (enforcer) |
 | `java` do PATH | 1.8.0_391 | `javapath` está no PATH **de máquina** e vence o de usuário — não bloqueia (Maven/IDE usam `JAVA_HOME`) |
 | Maven | 3.10.0 em `C:\Maven\...` | no PATH + `mvnw` funcionando |
 | SQLite | embutido (`sqlite-jdbc`) | `data/sia.db` |
+| Spotless + GJF | exige `--add-exports` no JVM do Maven | resolvido em `.mvn/jvm.config`; `spotless:check` verde |
 | Docker/Postgres | inexistentes | **fora de escopo** |
-| Git | branch `feature/automation-core` | 2 commits |
+| Git | branch `feature/automation-core` | commits pequenos por etapa |
 
 ## Decisões de arquitetura
 
 | # | Decisão | Escolha | Por quê | Alternativa descartada |
 |---|---|---|---|---|
-| D1 | Plataforma | **Java 21 LTS** + Maven multi-módulo | virtual threads para IO bloqueante; `record`/`sealed` para contrato | Gradle, Java 17 |
+| D1 | Plataforma | **Java 23** + Maven multi-módulo | mesmo runtime do bot (fim do atrito de bytecode); virtual threads, `record`/`sealed`, e agora `StructuredTaskScope` disponível | Java 21 (obrigaria recompilar o bot), Gradle |
 | D2 | Isolamento | **In-process**, classloader filho por plugin; `PluginHost` como costura | plugins internos; `URLClassLoader` não é sandbox — o limite é contrato, não promessa | `SecurityManager` (morto no JDK 24) |
 | D3 | Permissões | **Capability-based na fachada**, deny-by-default | único ponto de interceptação confiável | análise de bytecode |
 | D4 | Persistência | **SQLite** (`sqlite-jdbc`) + `SingleWriter` | máquina única, zero operação; WAL + 1 escritor serializado | Postgres (infra demais) |
@@ -38,8 +39,8 @@
 | D11 | Autenticação | **OIDC resource server**: JWT validado contra o JWKS do IdP, roles por claim, sem sessão e sem login próprio | identidade corporativa desde o início; o SIA nunca guarda senha de ninguém | token estático, tabela de usuários com senha |
 | D12 | Exposição | **`:8080` atrás de reverse proxy**; TLS termina no proxy; bind local no daemon | o proxy já existe — TLS e certificado não são problema do Core | TLS direto no Javalin |
 | D13 | Ordem da auth | **papéis + autorização + tokens de dev agora; OIDC quando o IdP for escolhido** | desbloqueia o resto do Core sem depender de tenant/app registration; `Authenticator` é a única peça que troca | esperar o IdP para tudo |
-| D14 | Primeiro plugin | **adaptador de processo** sobre o `ReceitanetBX-Bot.exe` | a automação é Java **23** (major 67) e o SIA roda em 21 — carregar in-process é impossível; o jpackage ainda removeu `java.exe`, sobrando só o `.exe`. O bot já expõe CLI headless completa | recompilar o bot para 21 / subir o SIA para 23 / arrastar um fat jar de 32 MB para dentro do plugin |
-| D15 | Execução de processo | `ProcessRunner` **no Core** (não `ProcessBuilder` no plugin), com allowlist de executável em config, timeout, saída limitada e permissão `EXEC_PROCESS` | plugin não escolhe o que executar; evita plugin virando shell | dar `ProcessBuilder` cru ao plugin |
+| D14 | Primeiro plugin | **adaptador de processo** sobre o `ReceitanetBX-Bot` | mesmo com SIA em 23 (bytecode já compatível), in-process seria ruim: fat jar de 32 MB com Derby, AWT/FlatLaf e motor oficial; o Derby tem lock exclusivo com o programa oficial; e um crash do bot não pode derrubar o daemon. Ele já expõe CLI headless completa | carregar in-process, recompilar o bot |
+| D15 | Execução de processo | `ProcessRunner` **no Core** (não `ProcessBuilder` no plugin): allowlist `processes.<nome>` → **comando base** (lista de args), timeout, saída limitada, permissão `EXEC_PROCESS` | plugin não escolhe o que executar; a lista de base permite trocar `exe` por `java -cp` sem tocar no plugin | dar `ProcessBuilder` cru ao plugin |
 
 ## Contratos públicos (`sia-api`)
 
@@ -170,7 +171,7 @@ Pragmas na abertura: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000`,
 
 ```
 ecac camila/
-├── pom.xml                  # parent com.accord: Java 21, enforcer, jacoco, spotless
+├── pom.xml                  # parent com.accord: Java 23, enforcer, jacoco, spotless
 ├── sia-api/                 # contratos. única dep: slf4j-api
 ├── sia-core/                # manager, loader, engine, scheduler, bus, persistence
 ├── sia-auth/                # OIDC: JWKS, validação de JWT, mapeamento de roles
@@ -214,15 +215,15 @@ O `ReceitanetBX-Bot` já é headless por CLI. O plugin é fino de propósito: mo
 | `receitanet.pendentes` | `pendentes` |
 | `receitanet.baixar` | `baixar --pedido <id>` ou `baixar --todos` |
 
-Parâmetros: `arquivo` (caminho da lista), `sistemas` (CSV de ids), `inicio`/`fim` (`dd/MM/aaaa`, validadas **antes** de gerar processo), `baixar` (bool), `limiteCnpjs` (int), `dryRun` (bool) e **`pin` sensível** → nunca persistido, nunca em log, redigido da saída do processo.
+Parâmetros: `arquivo` (caminho da lista), `sistemas` (CSV de ids), `inicio`/`fim` (`dd/MM/aaaa`, validadas **antes** de gerar processo), `baixar` (bool), `limiteCnpjs` (int), `dryRun` (bool) e `ni` (opcional, filtra o certificado). **Sem parâmetro de PIN**: a autenticação usa o certificado do repositório do Windows.
 
-Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usam o **mesmo banco Derby** (só um abre por vez), e `--pin` aparece na lista de processos do Windows — por isso a recomendação é certificado no repositório do Windows (`--ni`) ou token PKCS#11, e não PIN na linha de comando.
+Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usam o **mesmo banco Derby** (só um abre por vez), e o certificado vem do repositório do Windows (`--ni`), nunca de `--pin` na linha de comando (visível na lista de processos).
 
 ---
 
 ## Tasks
 
-- [x] **T0 — Ambiente + repo** · `devops-engineer` — JDK 21, Maven 3.10 + wrapper, branch, `.gitignore`, `.gitattributes`.
+- [x] **T0 — Ambiente + repo** · `devops-engineer` — JDK 23, Maven 3.10 + wrapper, branch, `.gitignore`, `.gitattributes`.
 - [x] **T1 — Esqueleto multi-módulo** · `backend-specialist` / `clean-code` — 7 módulos `sia-*` (incl. `sia-auth`), enforcer, jacoco, spotless. `BUILD SUCCESS` verificado.
 - [x] **T2 — Contratos (`sia-api`)** · `backend-specialist` / `api-patterns` — `AutomationPlugin`, `Automation`, `AutomationDescriptor`, `ParamSpec` (com `sensitive`), `PluginContext`, `AutomationContext` (runId/actor/params/serviços), `AutomationResult` (só chaves de saída), `Parameters` tipado, fachadas `Log`/`Storage`/`SecretAccess`/`EventPublisher`/`ProgressSink`/`CancellationToken`/`Configuration`, 6 exceções e `PluginContract` validando por campo. **26 testes verdes.**
   → *Verificado:* `mvn -pl sia-api test` = 26/26; `dependency:tree` do api segue só com `slf4j-api`; contrato rejeita metadata nula, id com maiúscula, `apiVersion: 2.0`, automação duplicada e parâmetro sensível com valor padrão.
@@ -247,9 +248,9 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
 - [ ] **T11b — OIDC/JWKS (adiado por decisão)** · `security-auditor` — implementar o `Authenticator` OIDC: JWKS com cache por `kid`, `iss`/`aud`/`exp`, `sia-cli login` (code + PKCE loopback) e guarda de credencial `0600`. Só a autenticação muda; `Authorizer`, papéis e rotas ficam intactos.
   → *Verificar:* token ausente → 401; `viewer` em `POST /api/runs` → 403; assinatura inválida → 401; login completo contra Keycloak no CI.
 - [ ] **T4b — Execução de processo** · `security-auditor` / `vulnerability-scanner` — `ProcessRunner` no `sia-api`, `ProcessRequest`/`ProcessResult`, allowlist `processes.<nome>.path` na config, permissão `EXEC_PROCESS`, timeout, saída limitada a 256 KB, redaction dos parametros sensiveis na captura, kill em cascata no cancelamento.
-  → *Verificar:* plugin sem `EXEC_PROCESS` → `PermissionDeniedException`; executável fora da allowlist → erro antes de subir processo; `sleep.py` de 10s com timeout 1s é morto (sem processo órfão); `--pin` não aparece na saída persistida.
-- [ ] **T13 — Plugin `receitanet-bx`** · `backend-specialist` + `test-engineer` — 6 automações da tabela acima, validação de data antes do processo, parser de saída com `errorCode` estavel, `pin` sensível, `plugin.yml` com `permissions: [process]`, testes com processo fake (`ProcessRunner` stub) + integração real opt-in (`-Dsia.receitanet.path=...`).
-  → *Verificar:* `receitanet.diag` contra o bot instalado devolve `SUCCESS` com contagem de sistemas; `lote` com data `31/04` falha em < 1s sem subir processo; saída com PIN é redigida.
+  → *Verificar:* plugin sem `EXEC_PROCESS` → `PermissionDeniedException`; executável fora da allowlist → erro antes de subir processo; `sleep.py` de 10s com timeout 1s é morto (sem processo órfão); nenhum argumento sensível fica na saída persistida.
+- [ ] **T13 — Plugin `receitanet-bx`** · `backend-specialist` + `test-engineer` — 6 automações da tabela acima, validação de data antes do processo, parser de saída com `errorCode` estável, certificado do Windows sem PIN, `plugin.yml` com `permissions: [process]`, testes com processo fake (`ProcessRunner` stub) + integração real opt-in (`-Dsia.receitanet.path=...`).
+  → *Verificar:* `receitanet.diag` contra o bot instalado devolve `SUCCESS` com contagem de sistemas; `lote` com data `31/04` falha em < 1s sem subir processo; `diag` com warnings (exit `-1`) não é tratado como falha quando a saída indica sucesso.
 - [ ] **T12 — Guia + segundo exemplo + hardening** · `documentation-writer` + `security-auditor` — `docs/PLUGIN_GUIDE.md` usando o `receitanet-bx` como caso real, um segundo plugin mínimo (sem dependências de e-mail/planilha), ADRs D1–D15, deprecação SemVer, compatibilidade binária.
   → *Verificar:* guia executado ponta a ponta pelo time; exemplo mínimo compila só contra `api`+`testkit`; cobertura do core ≥ 80%.
 
@@ -268,7 +269,7 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
 | Restart do daemon no meio de um run | Médio | `run` órfã marcada `INTERRUPTED` na subida; workflow retoma por nó |
 | Escopo inflar (UI, registry remoto, assinatura) antes do Core | Alto | D9 adiada por decisão; registry só quando o servidor de plugins existir |
 | Processo filho esquecido (órfão) ou PID vazado | Alto | `ProcessRunner` mata a árvore no timeout e no cancelamento; teste com `sleep` |
-| `--pin` do certificado visível na linha de comando | Médio | preferir certificado no repositório do Windows (`--ni`) ou PKCS#11; documentar o residual |
+| Certificado A1/token exigir PIN interativo | Médio | operação usa o repositório do Windows (`--ni`); se um token exigir PIN, avaliar `--pkcs11` com prompt fora do SIA |
 | Bot x Receitanet oficial no mesmo banco Derby | Médio | lock de instância já existe no bot; plugin reporta `XSDB6`/`42818` como `errorCode` estável |
 | Plugin exigir Windows (jpackage/ICP-Brasil) | Médio | `requiresOs` no manifesto; plugin falha com mensagem clara fora do Windows em vez de erro obscuro |
 
@@ -276,8 +277,7 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
 
 1. **IdP**: adiado por decisão — quando definir, preciso de `issuer`, `audience` e se o tenant tem App Roles (senão, mapa de `groups` → papel).
 2. **App registration**: quem cria o app do SIA no IdP (redirect `http://127.0.0.1:*`, escopo `api://sia/.default`)?
-3. **Caminho do bot**: o `receitanet-bx` vai ficar em `automacao/ReceitanetBX-Bot` no servidor, ou o plugin deve receber o caminho por config (`processes.receitanet.path`)?
-4. **PIN do certificado**: o time usa certificado A1/token com PIN, ou da para operar com o certificado do repositório do Windows (sem `--pin`)?
+3. **Comando base do bot**: `java -cp <jar> numberia.bot.Inicio` com o JDK do SIA (exit code confiável e `-Djava.awt.headless=true`) ou o `ReceitanetBX-Bot.exe` empacotado? Ambos cabem na allowlist; a escolha é qual vai para `config.yml` em produção.
 
 ## Phase X — Verificação final
 
