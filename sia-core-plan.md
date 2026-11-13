@@ -302,7 +302,7 @@ Duas ressalvas que o plugin precisa documentar: o bot e o Receitanet oficial usa
 
 1. **IdP**: adiado por decisão — quando definir, preciso de `issuer`, `audience` e se o tenant tem App Roles (senão, mapa de `groups` → papel).
 2. **App registration**: quem cria o app do SIA no IdP (redirect `http://127.0.0.1:*`, escopo `api://sia/.default`)?
-3. **Comando base do bot**: `java -cp <jar> numberia.bot.Inicio` com o JDK do SIA (exit code confiável e `-Djava.awt.headless=true`) ou o `ReceitanetBX-Bot.exe` empacotado? Ambos cabem na allowlist; a escolha é qual vai para `config.yml` em produção.
+3. **Comando base do bot**: `java -cp <jar> numberia.bot.Inicio` com o JDK do SIA (exit code confiável e `-Djava.awt.headless=true`) ou o `ReceitanetBX-Bot.exe` empacotado? Ambos cabem na allowlist; a escolha é qual vai para `config.yml` em produção. O manifesto do bot (lido do próprio JAR) exige, para rodar via `java`, as flags `--add-opens=java.base/java.security=ALL-UNNAMED` e `--add-exports=jdk.crypto.mscapi/sun.security.mscapi=ALL-UNNAMED` — sem elas o certificado do Windows não abre.
 
 ## Phase X — Verificação final
 
