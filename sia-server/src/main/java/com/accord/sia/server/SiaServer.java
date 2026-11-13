@@ -123,6 +123,17 @@ public final class SiaServer implements AutoCloseable {
     app.post("/api/plugins/{id}/enable", ctx -> changeState(ctx, true));
     app.post("/api/plugins/{id}/disable", ctx -> changeState(ctx, false));
     app.post("/api/plugins/{id}/reload", this::reloadPlugin);
+    app.before(
+        "/api/schedules",
+        ctx -> authorize(ctx, Permission.SCHEDULE_MANAGE, Permission.SCHEDULE_MANAGE));
+    app.before(
+        "/api/schedules/*",
+        ctx -> authorize(ctx, Permission.SCHEDULE_MANAGE, Permission.SCHEDULE_MANAGE));
+    app.get("/api/schedules", this::schedules);
+    app.post("/api/schedules", this::createSchedule);
+    app.post("/api/schedules/{id}/enable", ctx -> setScheduleState(ctx, true));
+    app.post("/api/schedules/{id}/disable", ctx -> setScheduleState(ctx, false));
+    app.delete("/api/schedules/{id}", this::deleteSchedule);
     app.get("/openapi.yaml", this::openapi);
 
     app.exception(
@@ -349,6 +360,48 @@ public final class SiaServer implements AutoCloseable {
     ctx.json(pluginView(plugin));
   }
 
+  private void schedules(Context ctx) {
+    ctx.json(core.schedules().stream().map(this::scheduleView).toList());
+  }
+
+  private void createSchedule(Context ctx) {
+    var payload = ctx.bodyAsClass(SchedulePayload.class);
+    Principal principal = ctx.attribute("principal");
+    var schedule =
+        core.createSchedule(
+            payload.automation(),
+            payload.trigger(),
+            payload.params() == null ? Map.of() : payload.params(),
+            principal.subject());
+    ctx.status(201).json(scheduleView(schedule));
+  }
+
+  private void setScheduleState(Context ctx, boolean enabled) {
+    core.setScheduleEnabled(ctx.pathParam("id"), enabled);
+    var schedule =
+        core.schedules().stream()
+            .filter(item -> item.id().equals(ctx.pathParam("id")))
+            .findFirst()
+            .orElseThrow();
+    ctx.json(scheduleView(schedule));
+  }
+
+  private void deleteSchedule(Context ctx) {
+    boolean deleted = core.deleteSchedule(ctx.pathParam("id"));
+    ctx.json(Map.of("deleted", deleted));
+  }
+
+  private Map<String, Object> scheduleView(com.accord.sia.core.schedule.Schedule schedule) {
+    Map<String, Object> view = new LinkedHashMap<>();
+    view.put("id", schedule.id());
+    view.put("automation", schedule.target());
+    view.put("trigger", schedule.trigger());
+    view.put("enabled", schedule.enabled());
+    view.put("nextFireAt", schedule.nextFireAt() == null ? null : schedule.nextFireAt().toString());
+    view.put("owner", schedule.owner());
+    return view;
+  }
+
   private void openapi(Context ctx) throws java.io.IOException {
     ctx.contentType("application/yaml");
     ctx.result(
@@ -391,6 +444,12 @@ public final class SiaServer implements AutoCloseable {
       return fallback;
     }
   }
+
+  /** Corpo do {@code POST /api/schedules}. */
+  public record SchedulePayload(
+      String automation,
+      com.accord.sia.core.schedule.Trigger trigger,
+      Map<String, String> params) {}
 
   /** Corpo dos endpoints de plugin. */
   public record PluginPathPayload(String path) {}

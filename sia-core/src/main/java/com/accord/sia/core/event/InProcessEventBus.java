@@ -25,7 +25,15 @@ public final class InProcessEventBus implements EventPublisher {
     }
   }
 
-  public void subscribe(String type, Consumer<Map<String, Object>> handler) {
-    subscribers.computeIfAbsent(type, key -> new CopyOnWriteArrayList<>()).add(handler);
+  public AutoCloseable subscribe(String type, Consumer<Map<String, Object>> handler) {
+    List<Consumer<Map<String, Object>>> bucket =
+        subscribers.computeIfAbsent(type, key -> new CopyOnWriteArrayList<>());
+    bucket.add(handler);
+    return () -> {
+      bucket.remove(handler);
+      if (bucket.isEmpty()) {
+        subscribers.remove(type, bucket);
+      }
+    };
   }
 }

@@ -29,6 +29,10 @@ import com.accord.sia.core.run.RunOutcome;
 import com.accord.sia.core.run.RunRecord;
 import com.accord.sia.core.run.RunRepository;
 import com.accord.sia.core.run.RunRequest;
+import com.accord.sia.core.schedule.Schedule;
+import com.accord.sia.core.schedule.ScheduleRepository;
+import com.accord.sia.core.schedule.SchedulerService;
+import com.accord.sia.core.schedule.Trigger;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -66,6 +70,7 @@ public final class SiaCore implements AutoCloseable {
   private final RunRepository repository;
   private final IdempotencyRepository idempotency;
   private final PluginContextFactory contexts;
+  private volatile SchedulerService scheduler;
   private final InstanceLock lock;
   private final List<String> loadFailures;
 
@@ -82,6 +87,7 @@ public final class SiaCore implements AutoCloseable {
       RunRepository repository,
       IdempotencyRepository idempotency,
       PluginContextFactory contexts,
+      SchedulerService scheduler,
       InstanceLock lock,
       List<String> loadFailures) {
     this.config = config;
@@ -96,6 +102,7 @@ public final class SiaCore implements AutoCloseable {
     this.repository = repository;
     this.idempotency = idempotency;
     this.contexts = contexts;
+    this.scheduler = scheduler;
     this.lock = lock;
     this.loadFailures = List.copyOf(loadFailures);
   }
@@ -132,21 +139,62 @@ public final class SiaCore implements AutoCloseable {
     List<String> failures = new ArrayList<>();
     loadPlugins(pluginsDirectory, registry, contexts, failures);
 
-    return new SiaCore(
-        config,
-        databasePath,
-        pluginsDirectory,
-        database,
-        writer,
-        events,
-        runEvents,
-        registry,
-        engine,
-        repository,
-        idempotency,
-        contexts,
-        lock,
-        failures);
+    SiaCore core =
+        new SiaCore(
+            config,
+            databasePath,
+            pluginsDirectory,
+            database,
+            writer,
+            events,
+            runEvents,
+            registry,
+            engine,
+            repository,
+            idempotency,
+            contexts,
+            null,
+            lock,
+            failures);
+    core.startScheduler();
+    return core;
+  }
+
+  private void startScheduler() {
+    ScheduleRepository schedules = new ScheduleRepository(database, writer, Clock.systemUTC());
+    this.scheduler =
+        new SchedulerService(schedules, this::launchScheduled, events, Clock.systemUTC());
+    scheduler.start();
+  }
+
+  private void launchScheduled(Schedule schedule, java.time.Instant fireTime) {
+    java.util.Map<String, Object> params = new java.util.LinkedHashMap<>(schedule.params());
+    submit(
+        schedule.target(),
+        Parameters.of(params),
+        Actor.system("scheduler", schedule.owner()),
+        "schedule");
+  }
+
+  public List<Schedule> schedules() {
+    return scheduler.list();
+  }
+
+  public Schedule createSchedule(
+      String target, Trigger trigger, Map<String, String> params, String owner) {
+    return scheduler.create(target, trigger, params, owner);
+  }
+
+  public void setScheduleEnabled(String id, boolean enabled) {
+    scheduler.setEnabled(id, enabled);
+  }
+
+  public boolean deleteSchedule(String id) {
+    return scheduler.delete(id);
+  }
+
+  public SchedulerService scheduler() {
+    return scheduler;
   }
 
   private static void loadPlugins(
@@ -371,6 +419,9 @@ public final class SiaCore implements AutoCloseable {
 
   @Override
   public void close() {
+    if (scheduler != null) {
+      scheduler.close();
+    }
     registry.unloadAll();
     engine.close();
     writer.close();
