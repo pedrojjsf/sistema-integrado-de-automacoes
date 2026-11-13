@@ -2,7 +2,7 @@
 
 > Plano de implementação (modo PLANNING — só andaime de build escrito até agora).
 > `@project-planner` + skills `plan-writing` e `architecture`.
-> **Revisão 4:** daemon HTTP com REST na v1, SQLite, retenção definida, regra "nada sensível no banco nem no log", multilíngue de SO.
+> **Revisão 5:** `groupId com.accord`, **SSO/OIDC na v1** (usuário real, não token estático), daemon em **8080 atrás de reverse proxy**, SQLite, retenção definida, regra "nada sensível no banco nem no log".
 
 ## Goal
 
@@ -31,10 +31,12 @@
 | D4 | Persistência | **SQLite** (`sqlite-jdbc`) + `SingleWriter` | máquina única, zero operação; WAL + 1 escritor serializado | Postgres (infra demais) |
 | D5 | Runtime | **Daemon HTTP + REST na v1**; CLI é **cliente** do daemon | um único dono do banco e do scheduler; nenhum cliente escreve direto | CLI acessando o banco |
 | D6 | Workflow | **DAG em YAML** com estado por nó | retomada e paralelismo real | lista sequencial |
-| D7 | Nomenclatura | grupo `com.sia`, artefatos `sia-api/core/server/cli/testkit` | nome do produto desde o início; renomear depois custa caro | manter `automation-*` |
+| D7 | Nomenclatura | grupo **`com.accord`**, pacotes `com.accord.sia.*`, artefatos `sia-api/core/auth/server/cli/testkit` | nome do produto desde o início; renomear depois custa caro | manter `automation-*` |
 | D8 | **Dado sensível** | **Nunca persiste payload**; `run`/`run_log` guardam **quem, quando e o quê**, não o conteúdo | automações baixam dados pessoais; log é passivo, não histórico | confiar em redaction preguiçosa |
 | D9 | Segredos | **Adiado**: `SecretStore` com implementação `env`; assinatura de plugin e registry remoto ficam para quando houver servidor de plugins | ainda não existe artefato para proteger | DPAPI (amarra ao Windows) |
 | D10 | Portabilidade | nenhum código específico de SO; `java.nio` para caminhos; sem shell-out | vai rodar em Linux no servidor | atalhos Windows |
+| D11 | Autenticação | **OIDC resource server**: JWT validado contra o JWKS do IdP, roles por claim, sem sessão e sem login próprio | identidade corporativa desde o início; o SIA nunca guarda senha de ninguém | token estático, tabela de usuários com senha |
+| D12 | Exposição | **`:8080` atrás de reverse proxy**; TLS termina no proxy; bind local no daemon | o proxy já existe — TLS e certificado não são problema do Core | TLS direto no Javalin |
 
 ## Contratos públicos (`sia-api`)
 
@@ -90,7 +92,25 @@ DISCOVERED → VALIDATED → LOADED → INITIALIZED → ENABLED ⇄ DISABLED →
 | GET/POST/PATCH | `/api/schedules` | cron, intervalo, evento |
 | POST | `/api/workflows/{name}/runs` · GET `/api/workflows/runs/{id}` | execução e estado do DAG |
 
-Regras do daemon: **bind padrão `127.0.0.1:8080`** (abrir para rede é escolha explícita em config), `Authorization: Bearer <token>` com comparação em tempo constante e tokens rotulados em config (`actor` vem do rótulo), `Idempotency-Key` no `POST /api/runs` (retry do cliente não duplica execução), **nunca logar corpo de requisição**, `graceful shutdown` em SIGTERM/interrupt (para scheduler, cancela runs, `shutdown()` de plugins, fecha o banco), instância única por arquivo de lock + porta.
+**Identidade e autorização (SSO)**
+
+O SIA é **resource server**, não provedor de identidade: não tem tela de login, não guarda senha, não emite token de usuário.
+
+- Token: `Authorization: Bearer <access_token>` (JWT). Validação local com `nimbus-jose-jwt`: assinatura contra **JWKS** do IdP (cache com `kid`, refresh em rotação), `iss`, `aud`, `exp`/`nbf` com tolerância de 30s de clock skew.
+- `actor` = claim `sub` (estável) + `preferred_username` no `run`; papéis vêm de claim configurável (`roles.claim`, default `groups`).
+- Papéis (mapeados do IdP para permissões do SIA):
+
+| Papel | Pode |
+|---|---|
+| `sia.viewer` | `GET` plugins, runs, logs, workflows |
+| `sia.operator` | + `POST /api/runs`, cancelar run, rodar workflow |
+| `sia.admin` | + install/enable/disable/reload de plugin, CRUD de schedule |
+
+- Sem permissão → **403**; sem token válido → **401** com `WWW-Authenticate: Bearer`.
+- **CLI**: `sia-cli login` usa **Authorization Code + PKCE** com redirect em loopback (`127.0.0.1:<porta efêmera>`), abre o navegador para o IdP e guarda o refresh token em `~/.sia/credentials.json` (permissão `0600`; no Windows, ACL do usuário). `--dev-token` só é aceito com `auth.mode=dev` em config, nunca por padrão.
+- Modo `dev` (sem IdP, para destravar o time): token estático local, explicitamente marcado no `/api/health` como `"auth":"dev"`.
+
+**Regras do daemon:** bind `127.0.0.1:8080` (o proxy fala com ele; abrir direto para a rede exige config explícita), confiar em `X-Forwarded-For/-Proto` **somente** do IP do proxy, `Idempotency-Key` no `POST /api/runs` (retry do cliente não duplica execução), **nunca logar corpo de requisição nem header de Authorization**, `graceful shutdown` em SIGTERM/interrupt (para scheduler, cancela runs, `shutdown()` de plugins, fecha o banco), instância única por lock file + porta.
 
 ## Persistência SQLite e retenção
 
@@ -110,9 +130,10 @@ Pragmas na abertura: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000`,
 
 ```
 ecac camila/
-├── pom.xml                  # parent: com.sia, Java 21, enforcer, jacoco, spotless
+├── pom.xml                  # parent com.accord: Java 21, enforcer, jacoco, spotless
 ├── sia-api/                 # contratos. única dep: slf4j-api
 ├── sia-core/                # manager, loader, engine, scheduler, bus, persistence
+├── sia-auth/                # OIDC: JWKS, validação de JWT, mapeamento de roles
 ├── sia-server/              # daemon Javalin, composition root, graceful shutdown
 ├── sia-cli/                 # cliente picocli (HTTP, JSON) — não toca banco
 ├── sia-testkit/             # harness in-process p/ autores de plugin
@@ -121,7 +142,7 @@ ecac camila/
 └── .agents/                 # toolkit (intocado)
 ```
 
-`sia-api` não depende de `sia-core`; plugins enxergam **só** `sia-api` + `sia-testkit`; `sia-cli` não depende de `sia-api` (fala só JSON — contrato por schema, não por classe compartilhada).
+`sia-api` não depende de `sia-core`; plugins enxergam **só** `sia-api` + `sia-testkit`; `sia-cli` não depende de `sia-api` (fala só JSON — contrato por schema, não por classe compartilhada); `sia-auth` não conhece plugin nenhum, só identidade.
 
 ---
 
@@ -145,7 +166,7 @@ ecac camila/
 ## Tasks
 
 - [x] **T0 — Ambiente + repo** · `devops-engineer` — JDK 21, Maven 3.10 + wrapper, branch, `.gitignore`, `.gitattributes`.
-- [x] **T1 — Esqueleto multi-módulo** · `backend-specialist` / `clean-code` — 6 módulos `sia-*`, enforcer, jacoco, spotless. `BUILD SUCCESS` verificado.
+- [x] **T1 — Esqueleto multi-módulo** · `backend-specialist` / `clean-code` — 7 módulos `sia-*` (incl. `sia-auth`), enforcer, jacoco, spotless. `BUILD SUCCESS` verificado.
 - [ ] **T2 — Contratos (`sia-api`)** · `backend-specialist` / `api-patterns` — interfaces/records, `ParamSpec.sensitive`, `Parameters`, `CancellationToken`, `ProgressSink`, 4 exceções; javadoc; teste de contrato (id duplicado, metadado nulo, descriptor sem `id`).
   → *Verificar:* `mvn -q -pl sia-api verify` verde; contratos sem dependência de Jackson/SQLite.
 - [ ] **T3 — Manifesto + validação** · `backend-specialist` / `api-patterns` — `plugin.yml`, JSON Schema, `PluginDescriptor`, compatibilidade `api-version`, `PluginValidator` (7 checagens).
@@ -162,16 +183,21 @@ ecac camila/
   → *Verificar:* 4 passos/3 plugins concluem; matar daemon no nó 3 e reiniciar retoma do 3; ciclo falha na validação.
 - [ ] **T9 — Archetype + TestKit** · `test-engineer` / `testing-patterns` — `sia-plugin-archetype`; `PluginTestKit` in-process (SQLite temp), `assertPermissionDenied`, `assertNoSensitiveDataInLogs`, teste de contrato herdado.
   → *Verificar:* archetype gera projeto que compila e passa `mvn verify` sem edição; TestKit < 20s.
-- [ ] **T10 — Daemon + REST + CLI cliente** · `backend-specialist` + `devops-engineer` / `deployment-procedures` — Javalin, auth bearer, idempotência, SSE de progresso, graceful shutdown, lock de instância, `openapi.yaml`; picocli: `plugins`, `run`, `runs`, `logs`, `workflow`, `doctor`.
-  → *Verificar:* `curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/health` 200; sem token 401; `run` com mesma `Idempotency-Key` duas vezes = 1 execução; `kill -TERM` desliga limpo sem run órfã.
-- [ ] **T11 — Exemplos + guia + hardening** · `documentation-writer` + `security-auditor` — 3 plugins (GreenMail, POI, Jsoup), `docs/PLUGIN_GUIDE.md`, ADRs D1–D10, deprecação SemVer, compatibilidade binária.
+- [ ] **T10 — Daemon + REST + CLI cliente** · `backend-specialist` + `devops-engineer` / `deployment-procedures` — Javalin em `127.0.0.1:8080`, rotas, idempotência, SSE de progresso, graceful shutdown, lock de instância, `openapi.yaml`; picocli: `plugins`, `run`, `runs`, `logs`, `workflow`, `doctor`.
+  → *Verificar:* `/api/health` 200; `run` com mesma `Idempotency-Key` duas vezes = 1 execução; `kill -TERM` desliga limpo sem run órfã; `X-Forwarded-For` só é aceito do IP do proxy.
+- [ ] **T11 — Auth SSO/OIDC** · `security-auditor` / `vulnerability-scanner` — `sia-auth`: JWKS com cache por `kid`, validação de assinatura/`iss`/`aud`/`exp`, mapeamento claim → papel, `Policy` por rota; modo `dev` isolado; `sia-cli login` (code + PKCE em loopback) e guarda de credencial com `0600`.
+  → *Verificar:* token ausente → 401 com `WWW-Authenticate`; token de `viewer` chamando `POST /api/runs` → 403; token assinado com chave errada → 401; `sia-cli login` completo contra IdP de teste (Keycloak no CI); `auth.mode=dev` marcado no health e proibido quando `env=prod`.
+- [ ] **T12 — Exemplos + guia + hardening** · `documentation-writer` + `security-auditor` — 3 plugins (GreenMail, POI, Jsoup), `docs/PLUGIN_GUIDE.md`, ADRs D1–D12, deprecação SemVer, compatibilidade binária.
   → *Verificar:* exemplos compilam só contra `api`+`testkit`; guia executável ponta a ponta; cobertura do core ≥ 80%.
 
 ## Riscos
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Daemon exposto além do localhost | Crítico | bind `127.0.0.1` por padrão; token obrigatório; doc explícita de que abrir exige TLS/reverse proxy |
+| Daemon exposto além do proxy | Crítico | bind `127.0.0.1`; o proxy é o único caminho; OIDC obrigatório fora de `dev` |
+| IdP indisponível / JWKS fora do ar | Alto | cache de JWKS com TTL longo e rotação por `kid`; modo degradado somente leitura |
+| Papel mal mapeado = escalada de privilégio | Alto | policy deny-by-default por rota; teste por papel; claim configurável por ambiente |
+| Refresh token no disco do analista | Médio | arquivo `0600`, rotação, `sia-cli logout`, nunca em log |
 | Log vazar dado pessoal por descuido do autor | Alto | `ParamSpec.sensitive` + `NoSensitiveDataTest` + payload nunca persistido (D8) |
 | SQLite: escritor único vira gargalo | Médio | `SingleWriter` com fila, WAL, transações curtas, métrica de fila |
 | `SQLITE_BUSY` por acesso concorrente (CLI, backup) | Médio | CLI **só** via HTTP; `VACUUM INTO` fora do horário; `busy_timeout` |
@@ -181,20 +207,22 @@ ecac camila/
 
 ## Em aberto
 
-1. **`groupId` definitivo** (`com.sia` é provisório) — qual o domínio reverso da empresa?
-2. **Auth do REST**: token estático rotulado basta na v1, ou já precisa de usuário/SSO?
-3. **Porta e bind** de produção (`8080` / `0.0.0.0` com reverse proxy?).
+1. **Qual IdP?** (Entra ID, Keycloak, Okta, Google Workspace) — define claim de papéis e se o `code + PKCE` em loopback é permitido no tenant.
+2. **Claim de papéis**: `groups` serve, ou o IdP expõe `roles`/`app_roles`?
+3. **Modo `dev`**: liberado na máquina do analista e bloqueado quando `env=prod` — confirma?
 
 ## Phase X — Verificação final
 
 ```bash
 ./mvnw -q clean verify
-./mvnw -q -pl sia-server test -Dtest=ApiContractTest,AuthTest,IdempotencyTest,GracefulShutdownTest
-java -jar sia-server/target/sia-server.jar &
+./mvnw -q -pl sia-auth,sia-server test -Dtest=JwtValidationTest,RolePolicyTest,ApiContractTest,IdempotencyTest,GracefulShutdownTest
+java -jar sia-server/target/sia-server.jar --config config/local.yml &
 curl -s localhost:8080/api/health
-./sia-cli run email.send -p to=dev@example.com
-./sia-cli runs --limit 5
+TOKEN=$(./sia-cli login --print-token)   # ou token do IdP
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/plugins
+java -jar sia-cli/target/sia-cli.jar run email.send -p to=dev@example.com
+java -jar sia-cli/target/sia-cli.jar runs --limit 5
 ./mvnw -q -pl sia-core test -Dtest=PermissionEnforcementTest,PluginIsolationTest,NoSensitiveDataTest,SqliteConcurrencyTest,WorkflowResumeTest
 ```
 
-Checklist: plugins isolados ✅ · permissões deny-by-default ✅ · falha de plugin não derruba o daemon ✅ · REST autenticado e idempotente ✅ · zero dado sensível em banco/log ✅ · retenção e backup ativos ✅ · workflow retomável ✅ · cobertura ≥ 80% ✅ · guia executável ✅ · ADRs D1–D10 ✅
+Checklist: plugins isolados ✅ · permissões deny-by-default ✅ · falha de plugin não derruba o daemon ✅ · REST autenticado por SSO e idempotente ✅ · 401/403 por papel testados ✅ · zero dado sensível em banco/log ✅ · retenção e backup ativos ✅ · workflow retomável ✅ · cobertura ≥ 80% ✅ · guia executável ✅ · ADRs D1–D12 ✅

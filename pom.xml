@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.sia</groupId>
+  <groupId>com.accord</groupId>
   <artifactId>sia-parent</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
@@ -14,6 +14,7 @@
   <modules>
     <module>sia-api</module>
     <module>sia-core</module>
+    <module>sia-auth</module>
     <module>sia-server</module>
     <module>sia-cli</module>
     <module>sia-testkit</module>
@@ -31,6 +32,7 @@
     <javalin.version>6.4.0</javalin.version>
     <sqlite.version>3.47.1.0</sqlite.version>
     <cronutils.version>9.2.1</cronutils.version>
+    <nimbus.version>10.10</nimbus.version>
 
     <junit.version>5.11.4</junit.version>
     <assertj.version>3.26.3</assertj.version>
@@ -47,17 +49,17 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.sia</groupId>
+        <groupId>com.accord</groupId>
         <artifactId>sia-api</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.sia</groupId>
+        <groupId>com.accord</groupId>
         <artifactId>sia-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.sia</groupId>
+        <groupId>com.accord</groupId>
         <artifactId>sia-testkit</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -106,6 +108,11 @@
         <groupId>com.cronutils</groupId>
         <artifactId>cron-utils</artifactId>
         <version>${cronutils.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.nimbusds</groupId>
+        <artifactId>nimbus-jose-jwt</artifactId>
+        <version>${nimbus.version}</version>
       </dependency>
 
       <dependency>
