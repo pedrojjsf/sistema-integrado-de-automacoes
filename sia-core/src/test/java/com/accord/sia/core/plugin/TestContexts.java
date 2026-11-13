@@ -4,6 +4,8 @@ import com.accord.sia.api.Configuration;
 import com.accord.sia.api.EventPublisher;
 import com.accord.sia.api.Log;
 import com.accord.sia.api.PluginContext;
+import com.accord.sia.api.ProcessException;
+import com.accord.sia.api.ProcessRunner;
 import com.accord.sia.api.SecretAccess;
 import com.accord.sia.api.Storage;
 import java.time.Clock;
@@ -17,7 +19,7 @@ final class TestContexts {
 
   static PluginContext noop(String pluginId) {
     return new PluginContext(
-        pluginId, log(), config(), storage(), events(), secrets(), Clock.systemUTC());
+        pluginId, log(), config(), storage(), events(), secrets(), processes(), Clock.systemUTC());
   }
 
   private static Log log() {
@@ -82,5 +84,11 @@ final class TestContexts {
 
   private static SecretAccess secrets() {
     return name -> Optional.empty();
+  }
+
+  private static ProcessRunner processes() {
+    return request -> {
+      throw new ProcessException(ProcessException.Reason.NOT_ALLOWED, "sem processos no teste");
+    };
   }
 }

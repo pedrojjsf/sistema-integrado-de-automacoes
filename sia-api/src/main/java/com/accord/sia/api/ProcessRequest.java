@@ -1,0 +1,43 @@
+package com.accord.sia.api;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Pedido de execucao de processo externo.
+ *
+ * <p>{@code executable} e um <b>nome logico</b> configurado no Core (allowlist), nunca um caminho
+ * de disco: se o plugin pudesse escolher o binario, a permissao {@code process} viraria execucao
+ * arbitraria.
+ *
+ * @param executable nome logico registrado na allowlist (ex.: {@code receitanet-bx})
+ * @param arguments argumentos adicionados ao comando base, na ordem
+ * @param timeout limite de execucao; nulo usa o padrao do Core
+ * @param redactValues valores que devem ser mascarados na saida capturada
+ */
+public record ProcessRequest(
+    String executable, List<String> arguments, Duration timeout, List<String> redactValues) {
+
+  public ProcessRequest {
+    Objects.requireNonNull(executable, "executable");
+    arguments = arguments == null ? List.of() : List.copyOf(arguments);
+    redactValues = redactValues == null ? List.of() : List.copyOf(redactValues);
+  }
+
+  public static ProcessRequest of(String executable, String... arguments) {
+    return new ProcessRequest(executable, List.of(arguments), null, List.of());
+  }
+
+  public static ProcessRequest of(String executable, List<String> arguments) {
+    return new ProcessRequest(executable, arguments, null, List.of());
+  }
+
+  public ProcessRequest withTimeout(Duration newTimeout) {
+    return new ProcessRequest(executable, arguments, newTimeout, redactValues);
+  }
+
+  public ProcessRequest withRedactedValues(String... values) {
+    return new ProcessRequest(executable, arguments, timeout, List.of(values));
+  }
+}

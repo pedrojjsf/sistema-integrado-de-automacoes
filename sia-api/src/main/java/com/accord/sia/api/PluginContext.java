@@ -16,6 +16,7 @@ import java.util.Objects;
  * @param storage armazenamento namespaced por plugin
  * @param events barramento de eventos do Core
  * @param secrets acesso a segredos, escopado por nome
+ * @param processes execucao de processos externos pela allowlist do Core
  * @param clock relogio do Core (para testes deterministas)
  */
 public record PluginContext(
@@ -25,6 +26,7 @@ public record PluginContext(
     Storage storage,
     EventPublisher events,
     SecretAccess secrets,
+    ProcessRunner processes,
     Clock clock) {
 
   public PluginContext {
@@ -34,6 +36,7 @@ public record PluginContext(
     Objects.requireNonNull(storage, "storage");
     Objects.requireNonNull(events, "events");
     Objects.requireNonNull(secrets, "secrets");
+    Objects.requireNonNull(processes, "processes");
     Objects.requireNonNull(clock, "clock");
   }
 }
