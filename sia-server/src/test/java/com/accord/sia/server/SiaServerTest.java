@@ -1,0 +1,123 @@
+package com.accord.sia.server;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.accord.sia.core.config.SiaConfig;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class SiaServerTest {
+
+  @TempDir static Path temp;
+
+  private static SiaServer server;
+  private static HttpClient http;
+  private static String base;
+
+  @BeforeAll
+  static void startDaemon() throws IOException {
+    SiaConfig config =
+        new SiaConfig(
+            new SiaConfig.Server("127.0.0.1", 0),
+            new SiaConfig.Database(temp.resolve("sia.db").toString()),
+            new SiaConfig.Plugins(temp.resolve("plugins").toString()),
+            new SiaConfig.Auth(
+                "dev",
+                Map.of(
+                    "admin-token",
+                    new SiaConfig.Auth.Token("sub-admin", "Admin", List.of("admin")),
+                    "viewer-token",
+                    new SiaConfig.Auth.Token("sub-viewer", "Viewer", List.of("viewer")))),
+            Map.of());
+    server = SiaServer.create(config).start("127.0.0.1", 0);
+    base = "http://127.0.0.1:" + server.port();
+    http = HttpClient.newHttpClient();
+  }
+
+  @AfterAll
+  static void stopDaemon() {
+    server.close();
+  }
+
+  @Test
+  void semTokenResponde401() throws Exception {
+    assertThat(get("/api/health", null).statusCode()).isEqualTo(401);
+  }
+
+  @Test
+  void tokenInvalidoResponde401() throws Exception {
+    assertThat(get("/api/health", "token-errado").statusCode()).isEqualTo(401);
+  }
+
+  @Test
+  void healthInformaModoDeAuth() throws Exception {
+    HttpResponse<String> response = get("/api/health", "admin-token");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("\"status\":\"ok\"").contains("\"auth\":\"dev\"");
+  }
+
+  @Test
+  void viewerLeCatalogoMasNaoExecuta() throws Exception {
+    assertThat(get("/api/plugins", "viewer-token").statusCode()).isEqualTo(200);
+    assertThat(get("/api/automations", "viewer-token").statusCode()).isEqualTo(200);
+
+    HttpResponse<String> post =
+        post("/api/runs", "viewer-token", "{\"automation\":\"x.y\",\"params\":{}}");
+    assertThat(post.statusCode()).isEqualTo(403);
+  }
+
+  @Test
+  void automacaoDesconhecidaResponde400() throws Exception {
+    HttpResponse<String> response =
+        post("/api/runs", "admin-token", "{\"automation\":\"nao.existe\",\"params\":{}}");
+
+    assertThat(response.statusCode()).isEqualTo(400);
+    assertThat(response.body()).contains("automacao desconhecida");
+  }
+
+  @Test
+  void execucaoDesconhecidaResponde400() throws Exception {
+    assertThat(get("/api/runs/nao-existe", "admin-token").statusCode()).isEqualTo(400);
+  }
+
+  @Test
+  void listaDeExecucoesComecaVazia() throws Exception {
+    HttpResponse<String> response = get("/api/runs?limit=5", "admin-token");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).isEqualTo("[]");
+  }
+
+  private static HttpResponse<String> get(String path, String token) throws Exception {
+    return http.send(request(path, token).GET().build(), HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static HttpResponse<String> post(String path, String token, String body)
+      throws Exception {
+    return http.send(
+        request(path, token)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static HttpRequest.Builder request(String path, String token) {
+    HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(base + path));
+    if (token != null) {
+      builder.header("Authorization", "Bearer " + token);
+    }
+    return builder;
+  }
+}

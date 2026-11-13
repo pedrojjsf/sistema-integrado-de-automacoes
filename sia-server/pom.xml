@@ -20,6 +20,10 @@
       <artifactId>sia-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.accord</groupId>
+      <artifactId>sia-auth</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.javalin</groupId>
       <artifactId>javalin</artifactId>
     </dependency>

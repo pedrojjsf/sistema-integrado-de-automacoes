@@ -8,6 +8,7 @@ import com.accord.sia.api.AutomationException;
 import com.accord.sia.api.AutomationResult;
 import com.accord.sia.api.Parameters;
 import com.accord.sia.api.PermissionDeniedException;
+import com.accord.sia.api.PluginContext;
 import com.accord.sia.api.RunId;
 import com.accord.sia.core.plugin.PluginRuntime;
 import com.accord.sia.core.plugin.PluginState;
@@ -30,14 +31,9 @@ import java.util.concurrent.TimeoutException;
 /**
  * Executa automacoes com limite de tempo, cancelamento e historico.
  *
- * <p>Garantias:
- *
- * <ul>
- *   <li>uma execucao por vez nao derruba o daemon: bulkhead por plugin, com fila curta;
- *   <li>timeout cancela o token e interrompe a thread do plugin;
- *   <li>tudo que e gravado passa pelo {@link Redactor} dos parametros sensiveis;
- *   <li>o banco guarda nomes de parametro e chaves de saida, nunca valores.
- * </ul>
+ * <p>{@link #execute} roda e devolve o desfecho (testes e runner). {@link #submit} registra a
+ * execucao e devolve o {@link RunId} na hora, deixando o trabalho em background — e o que o daemon
+ * HTTP precisa para responder 202 sem segurar a conexao.
  */
 public final class ExecutionEngine implements AutoCloseable {
 
@@ -65,7 +61,62 @@ public final class ExecutionEngine implements AutoCloseable {
     this.defaultTimeout = defaultTimeout == null ? Duration.ofMinutes(5) : defaultTimeout;
   }
 
+  /** Executa de forma sincrona e devolve o desfecho. */
   public RunOutcome execute(PluginRuntime plugin, RunRequest request) {
+    return run(prepare(plugin, request), request);
+  }
+
+  /** Registra a execucao e devolve o id imediatamente; o trabalho roda em background. */
+  public RunId submit(PluginRuntime plugin, RunRequest request) {
+    Prepared prepared = prepare(plugin, request);
+    executor.submit(() -> run(prepared, request));
+    return prepared.runId();
+  }
+
+  public boolean cancel(RunId runId) {
+    DefaultCancellationToken token = running.get(runId.value());
+    if (token == null) {
+      return false;
+    }
+    token.cancel();
+    return true;
+  }
+
+  /** Cancela tudo (desligamento gracioso do daemon). */
+  public int cancelAll() {
+    List<DefaultCancellationToken> tokens = new ArrayList<>(running.values());
+    tokens.forEach(DefaultCancellationToken::cancel);
+    return tokens.size();
+  }
+
+  public int runningCount() {
+    return running.size();
+  }
+
+  public Optional<RunOutcome> outcomeOf(RunId runId) {
+    return repository
+        .find(runId)
+        .map(record ->
+            new RunOutcome(
+                record.id(),
+                record.status(),
+                record.errorCode(),
+                record.message(),
+                Map.of(),
+                record.finishedAt() == null
+                    ? Duration.ZERO
+                    : Duration.between(record.startedAt(), record.finishedAt())));
+  }
+
+  private record Prepared(
+      RunId runId,
+      String pluginId,
+      Automation automation,
+      AutomationDescriptor descriptor,
+      Redactor redactor,
+      PluginContext services) {}
+
+  private Prepared prepare(PluginRuntime plugin, RunRequest request) {
     if (plugin.state() != PluginState.ENABLED) {
       throw new IllegalStateException(
           "plugin " + plugin.id() + " nao esta ENABLED (estado: " + plugin.state() + ")");
@@ -73,13 +124,6 @@ public final class ExecutionEngine implements AutoCloseable {
     Automation automation = findAutomation(plugin, request.automationId());
     AutomationDescriptor descriptor = automation.describe();
     Redactor redactor = redactorOf(descriptor, request.params());
-
-    Semaphore bulkhead =
-        bulkheads.computeIfAbsent(plugin.id(), key -> new Semaphore(permitsPerPlugin));
-    if (!acquire(bulkhead)) {
-      return reject(plugin, descriptor, request, redactor);
-    }
-
     RunId runId =
         repository.start(
             plugin.id(),
@@ -87,6 +131,24 @@ public final class ExecutionEngine implements AutoCloseable {
             request.actor(),
             request.trigger(),
             request.params().names());
+    return new Prepared(runId, plugin.id(), automation, descriptor, redactor, plugin.context());
+  }
+
+  private RunOutcome run(Prepared prepared, RunRequest request) {
+    RunId runId = prepared.runId();
+    Redactor redactor = prepared.redactor();
+    Duration timeout = request.timeout() == null ? defaultTimeout : request.timeout();
+    Semaphore bulkhead =
+        bulkheads.computeIfAbsent(prepared.pluginId(), key -> new Semaphore(permitsPerPlugin));
+
+    if (!acquire(bulkhead)) {
+      String message =
+          "limite de " + permitsPerPlugin + " execucoes simultaneas do plugin atingido";
+      repository.finish(runId, RunStatus.REJECTED, CONCURRENCY_LIMIT, message, List.of());
+      return new RunOutcome(
+          runId, RunStatus.REJECTED, CONCURRENCY_LIMIT, message, Map.of(), Duration.ZERO);
+    }
+
     Instant started = clock.instant();
     DefaultCancellationToken cancellation = new DefaultCancellationToken();
     running.put(runId.value(), cancellation);
@@ -95,25 +157,24 @@ public final class ExecutionEngine implements AutoCloseable {
     String errorCode = null;
     String message = null;
     Map<String, Object> outputs = Map.of();
-    Duration timeout = request.timeout() == null ? defaultTimeout : request.timeout();
-
     try {
+      PluginContext services = prepared.services();
       AutomationContext context =
           new AutomationContext(
               runId,
-              plugin.id(),
-              descriptor.id(),
+              prepared.pluginId(),
+              prepared.descriptor().id(),
               request.actor(),
               request.params(),
-              new RunLog(repository, redactor, runId, plugin.id()),
+              new RunLog(repository, redactor, runId, prepared.pluginId()),
               new RunProgress(repository, redactor, runId),
               cancellation,
-              plugin.context().storage(),
-              plugin.context().events(),
-              plugin.context().secrets(),
-              plugin.context().processes(),
+              services.storage(),
+              services.events(),
+              services.secrets(),
+              services.processes(),
               clock);
-      AutomationResult result = invoke(automation, context, timeout, cancellation);
+      AutomationResult result = invoke(prepared.automation(), context, timeout, cancellation);
       status = mapStatus(result.status());
       errorCode = result.errorCode();
       message = result.message();
@@ -147,27 +208,6 @@ public final class ExecutionEngine implements AutoCloseable {
     repository.finish(runId, status, errorCode, safeMessage, outputs.keySet());
     return new RunOutcome(
         runId, status, errorCode, safeMessage, outputs, Duration.between(started, clock.instant()));
-  }
-
-  /** Pede cancelamento de uma execucao em andamento. */
-  public boolean cancel(RunId runId) {
-    DefaultCancellationToken token = running.get(runId.value());
-    if (token == null) {
-      return false;
-    }
-    token.cancel();
-    return true;
-  }
-
-  /** Cancela tudo (desligamento gracioso do daemon). */
-  public int cancelAll() {
-    List<DefaultCancellationToken> tokens = new ArrayList<>(running.values());
-    tokens.forEach(DefaultCancellationToken::cancel);
-    return tokens.size();
-  }
-
-  public int runningCount() {
-    return running.size();
   }
 
   private Automation findAutomation(PluginRuntime plugin, String automationId) {
@@ -209,29 +249,6 @@ public final class ExecutionEngine implements AutoCloseable {
     }
   }
 
-  private RunOutcome reject(
-      PluginRuntime plugin,
-      AutomationDescriptor descriptor,
-      RunRequest request,
-      Redactor redactor) {
-    RunId runId =
-        repository.start(
-            plugin.id(),
-            descriptor.id(),
-            request.actor(),
-            request.trigger(),
-            request.params().names());
-    String message = "limite de " + permitsPerPlugin + " execucoes simultaneas do plugin atingido";
-    repository.finish(runId, RunStatus.REJECTED, CONCURRENCY_LIMIT, message, List.of());
-    return new RunOutcome(
-        runId,
-        RunStatus.REJECTED,
-        CONCURRENCY_LIMIT,
-        redactor.redact(message),
-        Map.of(),
-        Duration.ZERO);
-  }
-
   private static Redactor redactorOf(AutomationDescriptor descriptor, Parameters params) {
     List<String> sensitive = new ArrayList<>();
     for (var spec : descriptor.params()) {
@@ -263,21 +280,6 @@ public final class ExecutionEngine implements AutoCloseable {
     String detail = error.getMessage() == null ? "" : ": " + error.getMessage();
     String text = error.getClass().getSimpleName() + detail;
     return text.length() > 300 ? text.substring(0, 300) : text;
-  }
-
-  public Optional<RunOutcome> outcomeOf(RunId runId) {
-    return repository
-        .find(runId)
-        .map(record ->
-            new RunOutcome(
-                record.id(),
-                record.status(),
-                record.errorCode(),
-                record.message(),
-                Map.of(),
-                record.finishedAt() == null
-                    ? Duration.ZERO
-                    : Duration.between(record.startedAt(), record.finishedAt())));
   }
 
   @Override
