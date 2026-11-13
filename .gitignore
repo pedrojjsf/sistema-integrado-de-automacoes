@@ -29,3 +29,8 @@ automacao/ReceitanetBX-Bot/*.exe
 
 # toolkit local de agentes - nunca versionar
 .agents/
+
+# logs de runtime do bot (gerados a cada execucao)
+erros/
+*.log.*
+*.lck
