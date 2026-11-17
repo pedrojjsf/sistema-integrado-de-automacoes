@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archetype-descriptor name="sia-plugin" partial="false">
+  <requiredProperties>
+    <requiredProperty key="pluginId">
+      <defaultValue>meu-plugin</defaultValue>
+    </requiredProperty>
+  </requiredProperties>
+  <fileSets>
+    <fileSet filtered="true" packaged="true">
+      <directory>src/main/java</directory>
+    </fileSet>
+    <fileSet filtered="true" packaged="true">
+      <directory>src/test/java</directory>
+    </fileSet>
+    <fileSet filtered="true" encoding="UTF-8">
+      <directory></directory>
+      <includes>
+        <include>plugin.yml</include>
+      </includes>
+    </fileSet>
+  </fileSets>
+</archetype-descriptor>

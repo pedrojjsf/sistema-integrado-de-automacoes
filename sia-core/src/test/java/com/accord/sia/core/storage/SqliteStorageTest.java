@@ -34,8 +34,9 @@ class SqliteStorageTest {
     database = Database.open(temp.resolve("sia.db"));
     new SchemaMigrator().migrate(database);
     writer = new SingleWriter();
-    alpha = new SqliteStorage(database, writer, "alpha-plugin", Clock.systemUTC());
-    beta = new SqliteStorage(database, writer, "beta-plugin", Clock.systemUTC());
+    alpha =
+        new SqliteStorage(database, writer, "alpha-plugin", Clock.systemUTC(), permission -> {});
+    beta = new SqliteStorage(database, writer, "beta-plugin", Clock.systemUTC(), permission -> {});
   }
 
   @AfterEach

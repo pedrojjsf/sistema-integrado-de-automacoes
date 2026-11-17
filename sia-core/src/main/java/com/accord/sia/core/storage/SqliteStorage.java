@@ -1,9 +1,11 @@
 package com.accord.sia.core.storage;
 
+import com.accord.sia.api.PluginPermission;
 import com.accord.sia.api.Storage;
 import com.accord.sia.core.persistence.DataAccessException;
 import com.accord.sia.core.persistence.Database;
 import com.accord.sia.core.persistence.SingleWriter;
+import com.accord.sia.core.process.PermissionCheck;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -28,16 +30,30 @@ public final class SqliteStorage implements Storage {
   private final SingleWriter writer;
   private final String pluginId;
   private final Clock clock;
+  private final PermissionCheck permissions;
 
-  public SqliteStorage(Database database, SingleWriter writer, String pluginId, Clock clock) {
+  public SqliteStorage(
+      Database database,
+      SingleWriter writer,
+      String pluginId,
+      Clock clock,
+      PermissionCheck permissions) {
     this.database = database;
     this.writer = writer;
     this.pluginId = pluginId;
     this.clock = clock;
+    this.permissions = permissions;
+  }
+
+  private void requireStorage() {
+    if (permissions != null) {
+      permissions.require(PluginPermission.STORAGE);
+    }
   }
 
   @Override
   public Optional<String> get(String key) {
+    requireStorage();
     validateKey(key);
     String sql = "SELECT value FROM kv_store WHERE plugin_id = ? AND key = ?";
     try (Connection connection = database.connection();
@@ -54,6 +70,7 @@ public final class SqliteStorage implements Storage {
 
   @Override
   public void put(String key, String value) {
+    requireStorage();
     validateKey(key);
     if (value == null) {
       throw new IllegalArgumentException("valor nulo para a chave " + key);
@@ -79,6 +96,7 @@ public final class SqliteStorage implements Storage {
 
   @Override
   public void delete(String key) {
+    requireStorage();
     validateKey(key);
     String sql = "DELETE FROM kv_store WHERE plugin_id = ? AND key = ?";
     writer.writeVoid(() -> {
@@ -94,6 +112,7 @@ public final class SqliteStorage implements Storage {
 
   @Override
   public List<String> keys(String prefix) {
+    requireStorage();
     String safePrefix = prefix == null ? "" : prefix;
     String sql =
         "SELECT key FROM kv_store WHERE plugin_id = ? AND key LIKE ? ESCAPE '\\' ORDER BY key";

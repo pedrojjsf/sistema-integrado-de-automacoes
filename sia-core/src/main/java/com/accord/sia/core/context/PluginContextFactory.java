@@ -49,7 +49,7 @@ public final class PluginContextFactory {
         manifest.id(),
         new Slf4jLog(manifest.id()),
         new MapConfiguration(config),
-        new SqliteStorage(database, writer, manifest.id(), clock),
+        new SqliteStorage(database, writer, manifest.id(), clock, guard),
         events,
         new EnvSecretAccess(manifest.id(), guard),
         new DefaultProcessRunner(allowlist, guard),
