@@ -9,20 +9,22 @@ agenda execuções e orquestra tudo em **workflows** — sem conhecer a lógica 
 
 ## Rodar
 
-> Requer **JDK 23**. Se o `java` do PATH for outro (ex.: JRE 8), use o caminho completo do JDK,
-> por exemplo `"$env:JAVA_HOME\bin\java.exe"` no PowerShell.
+'> Requer **JDK 23**. Se o `java` do PATH for outro (ex.: JRE 8), use `siad.cmd`/`sia.cmd`:
+> eles pegam o executável de `%JAVA_HOME%` quando existe.
 
-```bash
-./mvnw -DskipTests package
+```bat
+mvnw.cmd -DskipTests package
 
-# daemon (config de exemplo em config/local.yml) — sobe em ~20 s
-java -jar sia-server/target/sia-server-1.0.0-SNAPSHOT-all.jar config/local.yml
+:: daemon (config padrão config\local.yml) — abre a porta em ~20 s
+siad.cmd
 
-# cliente, em outro terminal
-java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token doctor
-java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token plugins
-java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token run receitanet.diag
+:: cliente, em outro terminal
+sia.cmd --token dev-token doctor
+sia.cmd --token dev-token plugins
+sia.cmd --token dev-token run receitanet.diag
 ```
+
+No PowerShell os mesmos comandos funcionam como `.\\sia.cmd --token dev-token doctor`.'
 
 ### Adicionar um plugin
 

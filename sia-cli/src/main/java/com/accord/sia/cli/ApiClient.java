@@ -63,11 +63,17 @@ final class ApiClient {
       }
       return body;
     } catch (IOException error) {
-      throw new CliException("daemon inacessivel em " + baseUrl + " (" + error.getMessage() + ")");
+      throw new CliException(
+          "daemon inacessivel em " + baseUrl + " (" + describe(error) + ")");
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new CliException("requisicao interrompida");
     }
+  }
+
+  private static String describe(IOException error) {
+    String message = error.getMessage();
+    return message == null || message.isBlank() ? error.getClass().getSimpleName() : message;
   }
 
   /** Falha de uso ou de rede, com mensagem pronta para o usuario. */
