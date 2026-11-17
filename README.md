@@ -9,22 +9,26 @@ agenda execuções e orquestra tudo em **workflows** — sem conhecer a lógica 
 
 ## Rodar
 
-'> Requer **JDK 23**. Se o `java` do PATH for outro (ex.: JRE 8), use `siad.cmd`/`sia.cmd`:
-> eles pegam o executável de `%JAVA_HOME%` quando existe.
+Requer **JDK 23**. Os scripts `sia.cmd`/`siad.cmd` usam `%JAVA_HOME%` quando existe, então
+funcionam mesmo com outro `java` no PATH.
 
 ```bat
 mvnw.cmd -DskipTests package
 
-:: daemon (config padrão config\local.yml) — abre a porta em ~20 s
-siad.cmd
+:: iniciar (abre uma janela com o daemon; fechá-la encerra o SIA)
+iniciar-sia.cmd
+:: ou: sia.cmd start
 
-:: cliente, em outro terminal
-sia.cmd --token dev-token doctor
+:: conferir / parar
+sia.cmd status
+sia.cmd stop
+
+:: usar
 sia.cmd --token dev-token plugins
 sia.cmd --token dev-token run receitanet.diag
 ```
 
-No PowerShell os mesmos comandos funcionam como `.\\sia.cmd --token dev-token doctor`.'
+No PowerShell: `.\iniciar-sia.cmd` e `.\sia.cmd status`.
 
 ### Adicionar um plugin
 
