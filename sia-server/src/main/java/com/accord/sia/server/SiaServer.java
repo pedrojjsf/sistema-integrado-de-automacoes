@@ -45,7 +45,15 @@ public final class SiaServer implements AutoCloseable {
     this.core = core;
     this.principals = Map.copyOf(principals);
     this.authMode = authMode;
-    this.app = Javalin.create(config -> config.showJavalinBanner = false);
+    this.app =
+        Javalin.create(config -> {
+          config.showJavalinBanner = false;
+          config.staticFiles.add(staticFiles -> {
+            staticFiles.hostedPath = "/";
+            staticFiles.directory = "/web";
+            staticFiles.location = io.javalin.http.staticfiles.Location.CLASSPATH;
+          });
+        });
     registerRoutes();
   }
 
@@ -108,6 +116,7 @@ public final class SiaServer implements AutoCloseable {
     app.before("/api/runs", ctx -> authorize(ctx, Permission.RUN_READ, Permission.RUN_EXECUTE));
     app.before("/api/runs/*", ctx -> authorize(ctx, Permission.RUN_READ, Permission.RUN_EXECUTE));
 
+    app.get("/", ctx -> ctx.redirect("/index.html"));
     app.get("/api/health", this::health);
     app.get("/api/plugins", this::plugins);
     app.get("/api/plugins/{id}", this::plugin);

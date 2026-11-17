@@ -52,7 +52,23 @@ curl -X POST localhost:8080/api/plugins/install -H "Authorization: Bearer dev-to
 java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token plugins
 ```
 
-## Escrever um plugin
+'## Interface web
+
+O daemon serve a interface em **http://127.0.0.1:8080** (sem build, sem Node):
+
+| Tela | Para quê |
+|---|---|
+| Painel | execuções em andamento, plugins ativos, falhas recentes |
+| Automações | catálogo com formulário gerado dos parâmetros — executar sem saber REST |
+| Histórico | últimas execuções com status, duração, ator e log |
+| Agendas | criar/pausar/remover execuções automáticas |
+| Fluxos | executar workflows e ver o status por etapa |
+| Plugins | habilitar, desabilitar e remover |
+
+Na primeira visita a interface pede a **chave de acesso** (o token do `config/local.yml`).
+A linguagem visual está em [DESIGN.md](DESIGN.md).
+
+## Escrever um plugin'
 
 Guia completo: [docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md).
 

@@ -63,8 +63,7 @@ final class ApiClient {
       }
       return body;
     } catch (IOException error) {
-      throw new CliException(
-          "daemon inacessivel em " + baseUrl + " (" + describe(error) + ")");
+      throw new CliException("daemon inacessivel em " + baseUrl + " (" + describe(error) + ")");
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new CliException("requisicao interrompida");

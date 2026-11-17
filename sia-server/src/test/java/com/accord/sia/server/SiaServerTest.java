@@ -68,6 +68,22 @@ class SiaServerTest {
   }
 
   @Test
+  void serveAConsultaWebNaRaiz() throws Exception {
+    HttpResponse<String> redirect =
+        http.send(
+            java.net.http.HttpRequest.newBuilder(URI.create(base + "/")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+
+    assertThat(redirect.statusCode()).isEqualTo(302);
+    assertThat(redirect.headers().firstValue("Location"))
+        .hasValueSatisfying(location -> assertThat(location).endsWith("/index.html"));
+
+    HttpResponse<String> page = get("/index.html", "admin-token");
+    assertThat(page.statusCode()).isEqualTo(200);
+    assertThat(page.body()).contains("Sistema Integrado de Automações").contains("/app.js");
+  }
+
+  @Test
   void viewerLeCatalogoMasNaoExecuta() throws Exception {
     assertThat(get("/api/plugins", "viewer-token").statusCode()).isEqualTo(200);
     assertThat(get("/api/automations", "viewer-token").statusCode()).isEqualTo(200);
