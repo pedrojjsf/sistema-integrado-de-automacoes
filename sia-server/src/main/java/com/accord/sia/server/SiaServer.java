@@ -123,6 +123,7 @@ public final class SiaServer implements AutoCloseable {
     app.post("/api/plugins/{id}/enable", ctx -> changeState(ctx, true));
     app.post("/api/plugins/{id}/disable", ctx -> changeState(ctx, false));
     app.post("/api/plugins/{id}/reload", this::reloadPlugin);
+    app.post("/api/plugins/{id}/uninstall", this::uninstallPlugin);
     app.before(
         "/api/schedules",
         ctx -> authorize(ctx, Permission.SCHEDULE_MANAGE, Permission.SCHEDULE_MANAGE));
@@ -149,6 +150,9 @@ public final class SiaServer implements AutoCloseable {
           boolean forbidden = error.reason() == AuthorizationException.Reason.FORBIDDEN;
           ctx.status(forbidden ? 403 : 401).json(Map.of("error", error.getMessage()));
         });
+    app.exception(
+        IllegalStateException.class,
+        (error, ctx) -> ctx.status(409).json(Map.of("error", error.getMessage())));
     app.exception(
         IllegalArgumentException.class,
         (error, ctx) -> ctx.status(400).json(Map.of("error", error.getMessage())));
@@ -359,6 +363,16 @@ public final class SiaServer implements AutoCloseable {
       core.disablePlugin(id);
     }
     ctx.json(pluginView(core.plugin(id).orElseThrow()));
+  }
+
+  private void uninstallPlugin(Context ctx) {
+    String id = ctx.pathParam("id");
+    try {
+      core.uninstallPlugin(id);
+    } catch (java.io.IOException error) {
+      throw new IllegalStateException("falha ao remover arquivos do plugin " + id, error);
+    }
+    ctx.json(Map.of("uninstalled", id));
   }
 
   private void reloadPlugin(Context ctx)

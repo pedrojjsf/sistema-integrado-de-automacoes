@@ -120,6 +120,38 @@ class SiaCoreTest {
   }
 
   @Test
+  void estadoDesabilitadoSobreviveAoRestart() throws Exception {
+    core.disablePlugin("alpha-plugin");
+    core.close();
+
+    core = SiaCore.start(config());
+
+    assertThat(core.plugin("alpha-plugin").orElseThrow().state().name()).isEqualTo("DISABLED");
+  }
+
+  @Test
+  void estadoHabilitadoEhPersistido() throws Exception {
+    core.disablePlugin("alpha-plugin");
+    core.enablePlugin("alpha-plugin");
+    core.close();
+
+    core = SiaCore.start(config());
+
+    assertThat(core.plugin("alpha-plugin").orElseThrow().state().name()).isEqualTo("ENABLED");
+  }
+
+  @Test
+  void desinstalaPluginRemovendoArquivos() throws Exception {
+    Path directory = pluginsDirectory.resolve("alpha");
+    assertThat(directory).exists();
+
+    core.uninstallPlugin("alpha-plugin");
+
+    assertThat(core.plugin("alpha-plugin")).isEmpty();
+    assertThat(directory).doesNotExist();
+  }
+
+  @Test
   void recusaSegundoCoreNoMesmoBanco() throws Exception {
     assertThatThrownBy(() -> SiaCore.start(config()))
         .isInstanceOf(IllegalStateException.class)

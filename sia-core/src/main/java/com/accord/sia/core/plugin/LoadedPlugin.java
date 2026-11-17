@@ -17,13 +17,25 @@ public final class LoadedPlugin implements PluginRuntime, AutoCloseable {
   private final PluginManifest manifest;
   private final AutomationPlugin instance;
   private final PluginClassLoader classLoader;
+  private final java.nio.file.Path directory;
   private PluginState state = PluginState.LOADED;
   private PluginContext context;
 
-  LoadedPlugin(PluginManifest manifest, AutomationPlugin instance, PluginClassLoader classLoader) {
+  LoadedPlugin(
+      PluginManifest manifest,
+      AutomationPlugin instance,
+      PluginClassLoader classLoader,
+      java.nio.file.Path directory) {
     this.manifest = manifest;
     this.instance = instance;
     this.classLoader = classLoader;
+    this.directory = directory;
+    this.state = PluginState.LOADED;
+  }
+
+  /** Pasta do pacote no disco, usada por reload e uninstall. */
+  public java.nio.file.Path directory() {
+    return directory;
   }
 
   public PluginManifest manifest() {

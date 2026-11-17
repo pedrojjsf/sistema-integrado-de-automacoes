@@ -87,6 +87,14 @@ class SiaServerTest {
   }
 
   @Test
+  void uninstallDePluginDesconhecidoResponde400() throws Exception {
+    HttpResponse<String> response = post("/api/plugins/nao-existe/uninstall", "admin-token", "{}");
+
+    assertThat(response.statusCode()).isEqualTo(400);
+    assertThat(response.body()).contains("plugin desconhecido");
+  }
+
+  @Test
   void execucaoDesconhecidaResponde400() throws Exception {
     assertThat(get("/api/runs/nao-existe", "admin-token").statusCode()).isEqualTo(400);
   }

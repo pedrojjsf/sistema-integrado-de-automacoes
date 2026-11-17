@@ -21,6 +21,7 @@ import com.accord.sia.core.plugin.PluginDiscovery;
 import com.accord.sia.core.plugin.PluginLoader;
 import com.accord.sia.core.plugin.PluginPackage;
 import com.accord.sia.core.plugin.PluginRegistry;
+import com.accord.sia.core.plugin.PluginStateRepository;
 import com.accord.sia.core.process.ProcessAllowlist;
 import com.accord.sia.core.run.ExecutionEngine;
 import com.accord.sia.core.run.IdempotencyRepository;
@@ -77,6 +78,7 @@ public final class SiaCore implements AutoCloseable {
   private final RunRepository repository;
   private final IdempotencyRepository idempotency;
   private final PluginContextFactory contexts;
+  private final PluginStateRepository pluginStates;
   private final InstanceLock lock;
   private final List<String> loadFailures;
   private volatile SchedulerService scheduler;
@@ -97,6 +99,7 @@ public final class SiaCore implements AutoCloseable {
       RunRepository repository,
       IdempotencyRepository idempotency,
       PluginContextFactory contexts,
+      PluginStateRepository pluginStates,
       InstanceLock lock,
       List<String> loadFailures) {
     this.config = config;
@@ -112,6 +115,7 @@ public final class SiaCore implements AutoCloseable {
     this.repository = repository;
     this.idempotency = idempotency;
     this.contexts = contexts;
+    this.pluginStates = pluginStates;
     this.lock = lock;
     this.loadFailures = List.copyOf(loadFailures);
   }
@@ -146,7 +150,9 @@ public final class SiaCore implements AutoCloseable {
     Path pluginsDirectory = Path.of(config.plugins().directory());
     PluginRegistry registry = new PluginRegistry();
     List<String> failures = new ArrayList<>();
-    loadPlugins(pluginsDirectory, registry, contexts, failures);
+    PluginStateRepository pluginStates =
+        new PluginStateRepository(database, writer, Clock.systemUTC());
+    loadPlugins(pluginsDirectory, registry, contexts, failures, pluginStates);
 
     SiaCore core =
         new SiaCore(
@@ -163,6 +169,7 @@ public final class SiaCore implements AutoCloseable {
             repository,
             idempotency,
             contexts,
+            pluginStates,
             lock,
             failures);
     core.startWorkflow();
@@ -174,7 +181,8 @@ public final class SiaCore implements AutoCloseable {
       Path directory,
       PluginRegistry registry,
       PluginContextFactory contexts,
-      List<String> failures) {
+      List<String> failures,
+      PluginStateRepository pluginStates) {
     List<PluginCandidate> candidates;
     try {
       candidates = new PluginDiscovery().discover(directory);
@@ -188,12 +196,24 @@ public final class SiaCore implements AutoCloseable {
         LoadedPlugin plugin = loader.load(candidate);
         plugin.initialize(contexts.forPlugin(plugin.manifest(), Map.of()));
         plugin.enable();
+        boolean disabledBefore =
+            pluginStates.find(plugin.id()).map(row -> "DISABLED".equals(row.state())).orElse(false);
+        if (disabledBefore) {
+          plugin.disable();
+          pluginStates.save(plugin.id(), plugin.manifest().version(), "DISABLED", null);
+        } else {
+          pluginStates.save(plugin.id(), plugin.manifest().version(), "ENABLED", null);
+        }
         registry.register(plugin);
       } catch (InvalidPluginException | PluginLoadException | IOException error) {
         failures.add(candidate.directory().getFileName() + ": " + error.getMessage());
+        pluginStates.save(
+            candidate.directory().getFileName().toString(), "", "FAILED", error.getMessage());
         LOG.log(Level.WARNING, "plugin nao carregado: {0}", error.getMessage());
       } catch (RuntimeException error) {
         failures.add(candidate.directory().getFileName() + ": " + error.getMessage());
+        pluginStates.save(
+            candidate.directory().getFileName().toString(), "", "FAILED", error.getMessage());
       }
     }
   }
@@ -334,6 +354,7 @@ public final class SiaCore implements AutoCloseable {
       plugin.initialize(contexts.forPlugin(manifest, Map.of()));
       plugin.enable();
       registry.register(plugin);
+      pluginStates.save(plugin.id(), manifest.version(), "ENABLED", null);
       return plugin;
     } catch (IOException | InvalidPluginException | PluginLoadException | RuntimeException error) {
       if (plugin != null) {
@@ -346,11 +367,33 @@ public final class SiaCore implements AutoCloseable {
   }
 
   public synchronized void enablePlugin(String pluginId) {
-    plugin(pluginId).orElseThrow(() -> unknown(pluginId)).enable();
+    LoadedPlugin plugin = plugin(pluginId).orElseThrow(() -> unknown(pluginId));
+    plugin.enable();
+    pluginStates.save(plugin.id(), plugin.manifest().version(), "ENABLED", null);
   }
 
   public synchronized void disablePlugin(String pluginId) {
-    plugin(pluginId).orElseThrow(() -> unknown(pluginId)).disable();
+    LoadedPlugin plugin = plugin(pluginId).orElseThrow(() -> unknown(pluginId));
+    plugin.disable();
+    pluginStates.save(plugin.id(), plugin.manifest().version(), "DISABLED", null);
+  }
+
+  /** Descarrega, apaga o pacote do disco e remove o estado persistido. */
+  public synchronized void uninstallPlugin(String pluginId) throws IOException {
+    LoadedPlugin plugin = plugin(pluginId).orElseThrow(() -> unknown(pluginId));
+    plugin.unload();
+    registry.remove(pluginId);
+    Path directory = plugin.directory() == null ? null : plugin.directory().normalize();
+    if (directory != null
+        && directory.startsWith(pluginsDirectory.normalize())
+        && Files.isDirectory(directory)) {
+      try (var paths = Files.walk(directory)) {
+        for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+          Files.deleteIfExists(path);
+        }
+      }
+    }
+    pluginStates.delete(pluginId);
   }
 
   public synchronized LoadedPlugin reloadPlugin(String pluginId)

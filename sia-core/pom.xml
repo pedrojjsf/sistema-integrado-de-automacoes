@@ -70,6 +70,8 @@
               <goal>check</goal>
             </goals>
             <configuration>
+              <!-- sem testes nao ha dado de cobertura: o gate so vale quando a suite roda -->
+              <skip>${skipTests}</skip>
               <rules>
                 <rule>
                   <element>BUNDLE</element>

@@ -29,7 +29,7 @@ public final class PluginLoader {
       ProcessAutomationPlugin adapter =
           ProcessAutomationPlugin.start(manifest, candidate.directory());
       PluginContract.validate(adapter);
-      return new LoadedPlugin(manifest, adapter, null);
+      return new LoadedPlugin(manifest, adapter, null, candidate.directory());
     }
     URL artifact = candidate.artifact().toUri().toURL();
     PluginClassLoader classLoader =
@@ -38,7 +38,7 @@ public final class PluginLoader {
     try {
       AutomationPlugin instance = instantiate(classLoader, manifest);
       PluginContract.validate(instance);
-      return new LoadedPlugin(manifest, instance, classLoader);
+      return new LoadedPlugin(manifest, instance, classLoader, candidate.directory());
     } catch (InvalidPluginException | PluginLoadException error) {
       closeQuietly(classLoader);
       throw error;
