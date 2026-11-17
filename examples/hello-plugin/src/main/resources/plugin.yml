@@ -1,0 +1,9 @@
+id: hello-plugin
+name: Hello Plugin
+version: 1.0.0
+api-version: "1.0"
+author: Accord
+description: Exemplo minimo de plugin do SIA
+kind: java
+main: com.accord.examples.hello.HelloPlugin
+permissions: []

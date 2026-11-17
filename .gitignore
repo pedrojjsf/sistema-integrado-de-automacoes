@@ -1,0 +1,36 @@
+# build
+target/
+*.class
+
+# runtime data (SQLite, plugins instalados, logs)
+data/
+plugins/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# segredos
+.env
+.env.*
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# distribuicao do bot (binarios ~139 MB) - nao versionar no git
+automacao/ReceitanetBX-Bot/app/
+automacao/ReceitanetBX-Bot/runtime/
+automacao/ReceitanetBX-Bot/*.exe
+
+# toolkit local de agentes - nunca versionar
+.agents/
+
+# logs de runtime do bot (gerados a cada execucao)
+erros/
+*.log.*
+*.lck

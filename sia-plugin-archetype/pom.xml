@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.accord</groupId>
+    <artifactId>sia-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>sia-plugin-archetype</artifactId>
+  <packaging>jar</packaging>
+  <name>SIA Plugin Archetype</name>
+  <description>Gera o esqueleto de um plugin SIA (kind: java) que compila e roda no TestKit.</description>
+
+  <!--
+    Empacotado como jar de proposito: um arquétipo Maven é um jar com
+    META-INF/maven/archetype-metadata.xml e archetype-resources/. Evita depender do
+    packaging "maven-archetype", que exige extensão de build carregada antes do model.
+  -->
+</project>

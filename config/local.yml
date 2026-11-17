@@ -1,0 +1,33 @@
+# Configuracao local do SIA (exemplo versionado, sem segredos reais)
+server:
+  host: 127.0.0.1
+  port: 8080
+
+database:
+  path: data/sia.db
+
+plugins:
+  directory: plugins
+
+auth:
+  # dev: token estatico. O daemon recusa este modo em producao.
+  mode: dev
+  tokens:
+    dev-token:
+      subject: sub-dev
+      name: Desenvolvedor
+      roles: [admin]
+
+processes:
+  receitanet-bx:
+    # ${java.home} e ${env:VAR} sao resolvidos pelo Core na subida.
+    command:
+      - "${java.home}/bin/java"
+      - "--add-opens=java.base/java.security=ALL-UNNAMED"
+      - "--add-exports=jdk.crypto.mscapi/sun.security.mscapi=ALL-UNNAMED"
+      - "-Djava.awt.headless=true"
+      - "-Dfile.encoding=UTF-8"
+      - "-cp"
+      - "automacao/ReceitanetBX-Bot/app/receitanetbx-bot.jar"
+      - "numberia.bot.Inicio"
+    timeout-minutes: 15

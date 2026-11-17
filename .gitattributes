@@ -1,0 +1,9 @@
+# normaliza fim de linha (evita CRLF em .sh/.java)
+* text=auto eol=lf
+
+*.cmd text eol=crlf
+*.bat text eol=crlf
+mvnw text eol=lf
+
+*.jar binary
+*.db binary

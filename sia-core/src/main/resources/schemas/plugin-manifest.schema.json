@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://accord.com.br/sia/plugin-manifest.schema.json",
+  "title": "SIA plugin.yml",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "api-version", "kind"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,63}$",
+      "description": "Identificador unico do plugin (minusculo, com hifen)."
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$",
+      "description": "Versao do plugin em SemVer."
+    },
+    "api-version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Versao da API de plugin exigida; major precisa ser igual ao do Core."
+    },
+    "author": { "type": "string" },
+    "description": { "type": "string" },
+    "kind": {
+      "enum": ["java", "process"],
+      "description": "java = jar que depende de sia-api e roda no daemon; process = executavel proprio falado por JSON Lines."
+    },
+    "main": {
+      "type": "string",
+      "pattern": "^[a-z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+      "description": "Classe que implementa AutomationPlugin. Obrigatoria apenas em kind=java."
+    },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Comando de entrada. Elemento 0 precisa ser caminho relativo dentro do pacote do plugin."
+    },
+    "protocol": {
+      "enum": ["stdio-jsonl-v1"],
+      "default": "stdio-jsonl-v1"
+    },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["network", "storage", "secrets", "process", "events"] }
+    },
+    "dependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" }
+    },
+    "requires-os": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["windows", "linux", "macos"] }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "java" } }, "required": ["kind"] },
+      "then": { "required": ["main"], "not": { "required": ["command"] } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "process" } }, "required": ["kind"] },
+      "then": { "required": ["command"], "not": { "required": ["main"] } }
+    }
+  ]
+}

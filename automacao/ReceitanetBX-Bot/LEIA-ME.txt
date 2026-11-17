@@ -1,0 +1,134 @@
+Receitanet BX - bot com interface            (versao portatil)
+============================================================
+
+O que e
+-------
+Duplo clique em ReceitanetBX-Bot.exe e a janela abre. Nao precisa instalar
+nada: o Java 23 vai dentro desta pasta (runtime\), junto com o motor oficial do
+Receitanet BX e as dependencias (app\).
+
+Requisitos
+----------
+* Nenhum Java instalado. E' por isso que esta versao tem ~139 MB: ela leva o
+  proprio runtime. (A versao em jar, na pasta ReceitanetBX-bot-jar, tem 31 MB,
+  mas exige um Java 23 na maquina e um lancador .bat para nao pegar o Java 8 do
+  Receitanet BX.)
+* Certificado digital ICP-Brasil no repositorio do Windows (ou token/cartao com
+  o driver instalado).
+* Fechar o Receitanet BX oficial antes de usar: os dois usam o MESMO banco local
+  (%USERPROFILE%\ReceitanetBX) e o Derby so deixa um abrir por vez.
+
+Como usar
+---------
+   ReceitanetBX-Bot.exe                abre a janela
+   ReceitanetBX-Bot.exe diag           diagnostico
+   ReceitanetBX-Bot.exe ajuda          lista os comandos
+
+   Este exe nao abre janela de console: para ver a saida dos comandos, abra o
+   Prompt nesta pasta e rode o exe com o argumento.
+
+Periodo
+-------
+O periodo e' digitado no formato dd/mm/aaaa. Data que nao existe - 31/04,
+30/02, 29/02 fora de ano bissexto - e' barrada com aviso ANTES de qualquer
+pedido sair.
+
+Onde os arquivos sao salvos
+---------------------------
+Secao 5, ligadas por padrao:
+
+  [x] Organizar em empresa - CNPJ > sistema > periodo
+  [x] Tirar o hash (SHA-1) do nome dos arquivos
+
+Resultado:
+
+  Documents\Arquivos ReceitanetBX\
+     J&E AQUICULTURA - 23.965.501-0001-08\
+        SPED Fiscal - EFD ICMS IPI\
+           2024-03\
+              23965501000108-064881377-20240301-20240331-0-SPED-EFD.txt
+
+O bloco de 40 caracteres do servidor (o SHA-1) sai do nome na hora de salvar;
+CNPJ, inscricao estadual, periodo e o carimbo da transmissao ficam. Se o nome
+sem hash ja existir na pasta, o arquivo fica com o hash em vez de sobrescrever
+o outro.
+
+Banco de dados
+--------------
+* Se a maquina ja usou o Receitanet BX, o catalogo (sistemas, tipos de arquivo,
+  pesquisas e papeis) ja esta no banco - nao precisa sincronizar nada.
+* Se nunca usou, clique em "Sincronizar catalogo" na janela (usa rede e nao pede
+  certificado).
+* Os pedidos criados aqui aparecem no programa oficial, e vice-versa.
+* A pasta dos arquivos baixados e' configuracao da maquina
+  (Documents\Arquivos ReceitanetBX), trocavel na secao 5.
+
+Lista de CNPJs
+--------------
+A secao 1 carrega um .txt com uma empresa por linha:
+
+      23965501000108
+      23965501000108;J& E AQUICULTURA
+      J& E AQUICULTURA: 23965501000108
+
+Linhas vazias e as comecadas por # sao ignoradas.
+
+O que o bot baixa de cada pedido
+--------------------------------
+Por padrao, o ULTIMO arquivo transmitido de cada periodo (por estabelecimento),
+sem os recibos .rec - e' o que interessa nos SPEDs, em vez de todas as
+retificacoes antigas. Da' para mudar em "Arquivos a baixar..." (secao 5).
+
+Arquivos que aparecem ao rodar
+------------------------------
+   bot.log                    log da janela (pode apagar)
+   erros\erros-AAAAMMDD.log   log do motor do Receitanet BX (pode apagar)
+
+Sobre esta versao portatil
+--------------------------
+Gerada com o jpackage do JDK 23 (bot\portatil.bat). O runtime leva os modulos:
+
+    java.se, jdk.accessibility, jdk.crypto.mscapi, jdk.crypto.cryptoki,
+    jdk.crypto.ec, jdk.charsets, jdk.localedata, jdk.unsupported,
+    jdk.security.auth, jdk.security.jgss, jdk.xml.dom, jdk.zipfs, jdk.net,
+    jdk.naming.dns
+
+e os --add-opens/--add-exports que o certificado do Windows exige ja estao
+gravados em app\ReceitanetBX-Bot.cfg - e' por isso que o exe funciona sem .bat.
+
+O visual usa o FlatLaf (dentro do app\receitanetbx-bot.jar), com a barra de
+titulo escura tambem.
+
+Conferido com busca real (SPED Contribuicoes / Periodo da Escrituracao, 2024):
+39 arquivos devolvidos, 12 escolhidos.
+Se o "Conectar" falhar
+----------------------
+O bot e o Receitanet BX oficial usam o MESMO banco (%USERPROFILE%\ReceitanetBX) e
+so um abre por vez. Se aparecer "Nao foi possivel ler uma informacao a partir do
+banco de dados", primeiro feche o oficial (e outra copia do bot) e abra o bot de
+novo.
+
+Se continuar, o bot ja' resolve sozinho o caso mais comum - banco de OUTRA VERSAO
+do Receitanet BX. Na abertura ele verifica o banco; se for incompativel, avisa no
+log e passa a usar um banco proprio em  %USERPROFILE%\.receitanetbx-bot  sem
+mexer no banco do programa oficial (nada e' apagado nem renomeado). Nesse caso,
+clique uma vez em "Sincronizar catalogo" (usa rede, nao pede certificado) e os
+arquivos baixados vao para  %USERPROFILE%\Documents\Arquivos ReceitanetBX.
+
+Para conferir o motivo exato, veja o "Caused by" no erros\erros-AAAAMMDD.log:
+
+   XSDB6        outro processo abriu o banco -> feche-o e tente de novo
+   42818        "Comparisons between 'BIGINT' and 'CHAR ..." -> banco de outra
+                versao (o bot detecta e troca sozinho; se nao trocou, e' porque
+                o banco estava aberto no programa oficial na hora da abertura)
+   42X05/42S02  tabela ou coluna nao existe: mesma situacao do 42818
+   XJ040        o banco nao abre (antivirus, pasta somente leitura, disco cheio
+                ou copia incompleta da pasta)
+
+Forcar o banco proprio (banco-proprio.bat)
+------------------------------------------
+Se voce quiser usar o banco proprio desde a primeira abertura - ou se a deteccao
+nao pode rodar porque o programa oficial estava aberto - use o atalho
+banco-proprio.bat: ele abre o bot com a pasta "home" ao lado do .exe como banco.
+
+

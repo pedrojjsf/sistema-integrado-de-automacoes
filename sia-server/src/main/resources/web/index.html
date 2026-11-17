@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIA — Sistema Integrado de Automações</title>
+    <link rel="stylesheet" href="/styles.css?v=4" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230E5A5E'/><path d='M9 21V11h3l4 6 4-6h3v10h-3v-5l-4 6-4-6v5z' fill='white'/></svg>" />
+  </head>
+  <body>
+    <!-- visível por padrão: se o JS falhar, a tela de acesso continua aparecendo em vez de página em branco -->
+    <div id="login" class="login">
+      <form class="login-card" id="login-form">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">SIA</span>
+          <div>
+            <h1 class="display">Sistema Integrado de Automações</h1>
+            <p class="muted">Entre com sua chave de acesso para continuar.</p>
+          </div>
+        </div>
+        <label class="field">
+          <span class="field-label">Chave de acesso</span>
+          <input id="token-input" type="password" autocomplete="current-password" placeholder="cole a chave fornecida pelo administrador" required />
+        </label>
+        <p class="hint" id="login-error" hidden></p>
+        <button class="btn btn-primary" type="submit">Entrar</button>
+      </form>
+    </div>
+
+    <div id="app" class="app" hidden>
+      <aside class="sidebar">
+        <div class="brand small">
+          <span class="brand-mark" aria-hidden="true">SIA</span>
+          <span class="brand-name">Automações</span>
+        </div>
+        <nav class="nav" aria-label="Navegação principal">
+          <a href="#/painel" data-view="painel">Painel</a>
+          <a href="#/automacoes" data-view="automacoes">Automações</a>
+          <a href="#/historico" data-view="historico">Histórico</a>
+          <a href="#/agendas" data-view="agendas">Agendas</a>
+          <a href="#/workflows" data-view="workflows">Fluxos</a>
+          <a href="#/plugins" data-view="plugins">Plugins</a>
+        </nav>
+        <div class="sidebar-foot">
+          <span class="status-dot" id="conn-dot" aria-hidden="true"></span>
+          <span id="conn-label" class="muted">conectando…</span>
+          <button class="link" id="logout" type="button">Sair</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="view-eyebrow">Painel</p>
+            <h2 class="title" id="view-title">Visão geral</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost" id="refresh" type="button">Atualizar</button>
+          </div>
+        </header>
+        <section id="content" class="content" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <div id="drawer" class="drawer" hidden>
+      <div class="drawer-backdrop" data-close="drawer"></div>
+      <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+        <header class="drawer-head">
+          <div>
+            <p class="eyebrow" id="drawer-eyebrow">Execução</p>
+            <h3 class="title" id="drawer-title">Detalhe</h3>
+          </div>
+          <button class="icon-btn" data-close="drawer" type="button" aria-label="Fechar">✕</button>
+        </header>
+        <div class="drawer-body" id="drawer-body"></div>
+        <footer class="drawer-foot" id="drawer-foot"></footer>
+      </aside>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="/app.js?v=4"></script>
+  </body>
+</html>

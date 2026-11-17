@@ -1,0 +1,8 @@
+id: alpha-plugin
+name: Alpha
+version: 1.0.0
+api-version: "1.0"
+author: Testes
+kind: java
+main: testplugin.alpha.AlphaPlugin
+permissions: []

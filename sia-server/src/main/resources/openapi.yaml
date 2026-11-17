@@ -1,0 +1,151 @@
+openapi: 3.0.3
+info:
+  title: Sistema Integrado de Automações (SIA)
+  version: 1.0.0
+  description: |
+    API do daemon. Autenticação por bearer token; papéis viewer, operator e admin.
+    Regra da casa: parâmetros entram como nome (nunca valor sensível) e saídas como chave.
+servers:
+  - url: http://127.0.0.1:8080
+security:
+  - bearer: []
+paths:
+  /api/health:
+    get:
+      summary: Estado do daemon
+      responses:
+        "200": { description: ok }
+        "401": { description: sem token válido }
+  /api/plugins:
+    get:
+      summary: Lista plugins carregados
+      responses:
+        "200": { description: lista }
+  /api/plugins/{id}:
+    get:
+      summary: Detalhe de um plugin
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: plugin }
+        "400": { description: desconhecido }
+  /api/plugins/validate:
+    post:
+      summary: Valida um pacote sem instalar (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PluginPath" }
+      responses:
+        "200": { description: resultado da validação }
+  /api/plugins/install:
+    post:
+      summary: Instala, carrega e habilita um plugin (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PluginPath" }
+      responses:
+        "201": { description: plugin habilitado }
+        "400": { description: pacote inválido }
+  /api/plugins/{id}/enable:
+    post:
+      summary: Habilita plugin (admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: plugin }
+  /api/plugins/{id}/disable:
+    post:
+      summary: Desabilita plugin (admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: plugin }
+  /api/plugins/{id}/reload:
+    post:
+      summary: Recarrega plugin do disco (admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: plugin }
+  /api/automations:
+    get:
+      summary: Catálogo de automações
+      responses:
+        "200": { description: lista }
+  /api/runs:
+    get:
+      summary: Execuções recentes
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        "200": { description: lista }
+    post:
+      summary: Cria uma execução (operator)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+          description: Mesma chave devolve o mesmo runId, sem duplicar execução.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [automation]
+              properties:
+                automation: { type: string, example: receitanet.diag }
+                params: { type: object, additionalProperties: true }
+      responses:
+        "202": { description: aceito, devolve runId }
+        "400": { description: automação desconhecida }
+        "403": { description: papel sem permissão }
+  /api/runs/{id}:
+    get:
+      summary: Detalhe de uma execução
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: execução }
+  /api/runs/{id}/logs:
+    get:
+      summary: Log da execução (sem dado sensível)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: linhas }
+  /api/runs/{id}/events:
+    get:
+      summary: Stream SSE de progresso
+      description: Eventos `ready`, `log`, `progress`, `step`, `ping` e `finished`.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+  /api/runs/{id}/cancel:
+    post:
+      summary: Pede cancelamento (operator)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{cancelled: boolean}" }
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    PluginPath:
+      type: object
+      required: [path]
+      properties:
+        path: { type: string, description: caminho do JAR no host do daemon }

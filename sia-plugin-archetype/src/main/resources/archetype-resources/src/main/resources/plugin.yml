@@ -1,0 +1,9 @@
+id: ${pluginId}
+name: ${pluginId}
+version: 1.0.0
+api-version: "1.0"
+author: ${groupId}
+description: Descreva aqui o que o plugin faz
+kind: java
+main: ${package}.SamplePlugin
+permissions: []
