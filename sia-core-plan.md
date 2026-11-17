@@ -20,7 +20,7 @@
 | SQLite | embutido (`sqlite-jdbc`) | `data/sia.db` |
 | Spotless + GJF | exige `--add-exports` no JVM do Maven | resolvido em `.mvn/jvm.config`; `spotless:check` verde |
 | Docker/Postgres | inexistentes | **fora de escopo** |
-| Git | branch `feature/automation-core` | commits pequenos por etapa |
+| Git | branch `main` | commits pequenos por etapa |
 
 ## Decisões de arquitetura
 
