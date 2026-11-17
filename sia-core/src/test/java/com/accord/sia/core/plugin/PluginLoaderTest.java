@@ -95,23 +95,23 @@ class PluginLoaderTest {
   }
 
   @Test
-  void rejeitaKindProcessEnquantoNaoHaHost() throws Exception {
-    Path directory = Files.createDirectories(pluginsDirectory.resolve("process-plugin"));
+  void rejeitaPluginDeProcessoQueNaoRespondeAoHandshake() throws Exception {
+    Path directory = Files.createDirectories(pluginsDirectory.resolve("process-mudo"));
     Files.writeString(
         directory.resolve("plugin.yml"),
         """
-        id: process-plugin
+        id: process-mudo
         name: Process
         version: 1.0.0
         api-version: "1.0"
         kind: process
-        command: ["python", "main.py"]
+        command: ["java", "-version"]
         """);
     Files.write(directory.resolve("plugin.jar"), new byte[] {0});
 
     assertThatThrownBy(() -> loader.load(candidateOf(directory)))
         .isInstanceOf(PluginLoadException.class)
-        .hasMessageContaining("kind=process");
+        .hasMessageContaining("handshake");
   }
 
   @Test

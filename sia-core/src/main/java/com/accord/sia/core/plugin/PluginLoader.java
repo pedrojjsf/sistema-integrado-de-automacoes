@@ -7,6 +7,7 @@ import com.accord.sia.api.PluginLoadException;
 import com.accord.sia.core.manifest.ManifestLoader;
 import com.accord.sia.core.manifest.PluginKind;
 import com.accord.sia.core.manifest.PluginManifest;
+import com.accord.sia.core.process.ProcessAutomationPlugin;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
@@ -24,9 +25,11 @@ public final class PluginLoader {
   public LoadedPlugin load(PluginCandidate candidate)
       throws IOException, InvalidPluginException, PluginLoadException {
     PluginManifest manifest = manifestLoader.read(candidate.manifestFile());
-    if (manifest.kind() != PluginKind.JAVA) {
-      throw new PluginLoadException(
-          manifest.id(), "kind=process ainda nao suportado (depende do host stdio-jsonl-v1)");
+    if (manifest.kind() == PluginKind.PROCESS) {
+      ProcessAutomationPlugin adapter =
+          ProcessAutomationPlugin.start(manifest, candidate.directory());
+      PluginContract.validate(adapter);
+      return new LoadedPlugin(manifest, adapter, null);
     }
     URL artifact = candidate.artifact().toUri().toURL();
     PluginClassLoader classLoader =

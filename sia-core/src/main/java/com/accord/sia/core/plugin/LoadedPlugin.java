@@ -84,10 +84,12 @@ public final class LoadedPlugin implements PluginRuntime, AutoCloseable {
     try {
       instance.shutdown();
     } finally {
-      try {
-        classLoader.close();
-      } catch (IOException ignored) {
-        // fechar o jar nao pode impedir a saida do estado UNLOADED
+      if (classLoader != null) {
+        try {
+          classLoader.close();
+        } catch (IOException ignored) {
+          // fechar o jar nao pode impedir a saida do estado UNLOADED
+        }
       }
       state = PluginState.UNLOADED;
     }
