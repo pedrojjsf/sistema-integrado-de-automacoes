@@ -33,6 +33,11 @@ import com.accord.sia.core.schedule.Schedule;
 import com.accord.sia.core.schedule.ScheduleRepository;
 import com.accord.sia.core.schedule.SchedulerService;
 import com.accord.sia.core.schedule.Trigger;
+import com.accord.sia.core.workflow.StepExecutor;
+import com.accord.sia.core.workflow.WorkflowDefinition;
+import com.accord.sia.core.workflow.WorkflowEngine;
+import com.accord.sia.core.workflow.WorkflowLoader;
+import com.accord.sia.core.workflow.WorkflowRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -49,7 +54,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Núcleo montado: banco migrado, lock de instancia, plugins carregados e engine pronto.
+ * Núcleo montado: banco migrado, lock de instancia, plugins carregados, engine, scheduler e
+ * workflows.
  *
  * <p>E o composition root compartilhado entre o daemon HTTP e os testes — o caminho exercitado no
  * teste e o mesmo que roda em producao.
@@ -61,6 +67,7 @@ public final class SiaCore implements AutoCloseable {
   private final SiaConfig config;
   private final Path databasePath;
   private final Path pluginsDirectory;
+  private final Path workflowsDirectory;
   private final Database database;
   private final SingleWriter writer;
   private final InProcessEventBus events;
@@ -70,14 +77,17 @@ public final class SiaCore implements AutoCloseable {
   private final RunRepository repository;
   private final IdempotencyRepository idempotency;
   private final PluginContextFactory contexts;
-  private volatile SchedulerService scheduler;
   private final InstanceLock lock;
   private final List<String> loadFailures;
+  private volatile SchedulerService scheduler;
+  private volatile WorkflowEngine workflowEngine;
+  private volatile WorkflowRepository workflowRepository;
 
   private SiaCore(
       SiaConfig config,
       Path databasePath,
       Path pluginsDirectory,
+      Path workflowsDirectory,
       Database database,
       SingleWriter writer,
       InProcessEventBus events,
@@ -87,12 +97,12 @@ public final class SiaCore implements AutoCloseable {
       RunRepository repository,
       IdempotencyRepository idempotency,
       PluginContextFactory contexts,
-      SchedulerService scheduler,
       InstanceLock lock,
       List<String> loadFailures) {
     this.config = config;
     this.databasePath = databasePath;
     this.pluginsDirectory = pluginsDirectory;
+    this.workflowsDirectory = workflowsDirectory;
     this.database = database;
     this.writer = writer;
     this.events = events;
@@ -102,7 +112,6 @@ public final class SiaCore implements AutoCloseable {
     this.repository = repository;
     this.idempotency = idempotency;
     this.contexts = contexts;
-    this.scheduler = scheduler;
     this.lock = lock;
     this.loadFailures = List.copyOf(loadFailures);
   }
@@ -144,6 +153,7 @@ public final class SiaCore implements AutoCloseable {
             config,
             databasePath,
             pluginsDirectory,
+            Path.of("workflows"),
             database,
             writer,
             events,
@@ -153,48 +163,11 @@ public final class SiaCore implements AutoCloseable {
             repository,
             idempotency,
             contexts,
-            null,
             lock,
             failures);
+    core.startWorkflow();
     core.startScheduler();
     return core;
-  }
-
-  private void startScheduler() {
-    ScheduleRepository schedules = new ScheduleRepository(database, writer, Clock.systemUTC());
-    this.scheduler =
-        new SchedulerService(schedules, this::launchScheduled, events, Clock.systemUTC());
-    scheduler.start();
-  }
-
-  private void launchScheduled(Schedule schedule, java.time.Instant fireTime) {
-    java.util.Map<String, Object> params = new java.util.LinkedHashMap<>(schedule.params());
-    submit(
-        schedule.target(),
-        Parameters.of(params),
-        Actor.system("scheduler", schedule.owner()),
-        "schedule");
-  }
-
-  public List<Schedule> schedules() {
-    return scheduler.list();
-  }
-
-  public Schedule createSchedule(
-      String target, Trigger trigger, Map<String, String> params, String owner) {
-    return scheduler.create(target, trigger, params, owner);
-  }
-
-  public void setScheduleEnabled(String id, boolean enabled) {
-    scheduler.setEnabled(id, enabled);
-  }
-
-  public boolean deleteSchedule(String id) {
-    return scheduler.delete(id);
-  }
-
-  public SchedulerService scheduler() {
-    return scheduler;
   }
 
   private static void loadPlugins(
@@ -223,6 +196,33 @@ public final class SiaCore implements AutoCloseable {
         failures.add(candidate.directory().getFileName() + ": " + error.getMessage());
       }
     }
+  }
+
+  private void startWorkflow() {
+    this.workflowRepository = new WorkflowRepository(database, writer, Clock.systemUTC());
+    StepExecutor executor =
+        (automationId, params) -> {
+          RunOutcome outcome = execute(automationId, params, Actor.system("workflow", null));
+          return new StepExecutor.StepOutcome(
+              outcome.succeeded(), outcome.errorCode(), outcome.message(), outcome.outputs());
+        };
+    this.workflowEngine = new WorkflowEngine(workflowRepository, executor);
+  }
+
+  private void startScheduler() {
+    ScheduleRepository schedules = new ScheduleRepository(database, writer, Clock.systemUTC());
+    this.scheduler =
+        new SchedulerService(schedules, this::launchScheduled, events, Clock.systemUTC());
+    scheduler.start();
+  }
+
+  private void launchScheduled(Schedule schedule, java.time.Instant fireTime) {
+    Map<String, Object> params = new LinkedHashMap<>(schedule.params());
+    submit(
+        schedule.target(),
+        Parameters.of(params),
+        Actor.system("scheduler", schedule.owner()),
+        "schedule");
   }
 
   public Path databasePath() {
@@ -303,7 +303,6 @@ public final class SiaCore implements AutoCloseable {
         .orElseThrow(() -> new IllegalArgumentException("automacao desconhecida: " + automationId));
   }
 
-  /** Valida o pacote sem carregar o plugin: manifesto e presenca da classe principal. */
   public PluginValidation validatePlugin(Path jar) throws IOException, InvalidPluginException {
     PluginManifest manifest = PluginPackage.readManifest(jar);
     boolean mainPresent =
@@ -312,7 +311,6 @@ public final class SiaCore implements AutoCloseable {
         manifest.id(), manifest.version(), manifest.kind().wireName(), mainPresent);
   }
 
-  /** Instala (copia, carrega e habilita) um plugin a partir do JAR enviado. */
   public synchronized LoadedPlugin installPlugin(Path jar)
       throws IOException, InvalidPluginException, PluginLoadException {
     PluginManifest manifest = PluginPackage.readManifest(jar);
@@ -405,6 +403,72 @@ public final class SiaCore implements AutoCloseable {
     return engine.runningCount();
   }
 
+  public List<Schedule> schedules() {
+    return scheduler.list();
+  }
+
+  public Schedule createSchedule(
+      String target, Trigger trigger, Map<String, String> params, String owner) {
+    return scheduler.create(target, trigger, params, owner);
+  }
+
+  public void setScheduleEnabled(String id, boolean enabled) {
+    scheduler.setEnabled(id, enabled);
+  }
+
+  public boolean deleteSchedule(String id) {
+    return scheduler.delete(id);
+  }
+
+  public SchedulerService scheduler() {
+    return scheduler;
+  }
+
+  public List<String> workflowNames() throws IOException {
+    if (!Files.isDirectory(workflowsDirectory)) {
+      return List.of();
+    }
+    try (var files = Files.list(workflowsDirectory)) {
+      return files
+          .filter(path -> path.toString().endsWith(".yml") || path.toString().endsWith(".yaml"))
+          .map(path -> path.getFileName().toString().replaceFirst("\\.ya?ml$", ""))
+          .sorted()
+          .toList();
+    }
+  }
+
+  public WorkflowEngine.WorkflowRun runWorkflow(String name, Map<String, Object> inputs)
+      throws IOException {
+    Path file = workflowFile(name);
+    String yaml = Files.readString(file, StandardCharsets.UTF_8);
+    WorkflowDefinition definition = new WorkflowLoader().parse(yaml);
+    return workflowEngine.run(definition, yaml, inputs == null ? Map.of() : inputs);
+  }
+
+  public WorkflowEngine.WorkflowRun resumeWorkflow(String runId) throws IOException {
+    return workflowEngine.resume(runId);
+  }
+
+  public WorkflowEngine.WorkflowRun workflowRun(String runId) {
+    return workflowEngine.load(runId);
+  }
+
+  public List<WorkflowEngine.WorkflowRun> workflowRuns(int limit) {
+    return workflowEngine.recent(limit);
+  }
+
+  private Path workflowFile(String name) {
+    Path yml = workflowsDirectory.resolve(name + ".yml");
+    if (Files.isRegularFile(yml)) {
+      return yml;
+    }
+    Path yaml = workflowsDirectory.resolve(name + ".yaml");
+    if (Files.isRegularFile(yaml)) {
+      return yaml;
+    }
+    throw new IllegalArgumentException("workflow desconhecido: " + name);
+  }
+
   public RunRepository repository() {
     return repository;
   }
@@ -419,6 +483,9 @@ public final class SiaCore implements AutoCloseable {
 
   @Override
   public void close() {
+    if (workflowEngine != null) {
+      workflowEngine.close();
+    }
     if (scheduler != null) {
       scheduler.close();
     }

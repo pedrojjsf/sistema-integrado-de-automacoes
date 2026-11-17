@@ -134,6 +134,13 @@ public final class SiaServer implements AutoCloseable {
     app.post("/api/schedules/{id}/enable", ctx -> setScheduleState(ctx, true));
     app.post("/api/schedules/{id}/disable", ctx -> setScheduleState(ctx, false));
     app.delete("/api/schedules/{id}", this::deleteSchedule);
+    app.before(
+        "/api/workflows*", ctx -> authorize(ctx, Permission.RUN_READ, Permission.RUN_EXECUTE));
+    app.get("/api/workflows", this::workflows);
+    app.post("/api/workflows/{name}/runs", this::runWorkflow);
+    app.get("/api/workflows/runs", this::workflowRuns);
+    app.get("/api/workflows/runs/{id}", this::workflowRun);
+    app.post("/api/workflows/runs/{id}/resume", this::resumeWorkflow);
     app.get("/openapi.yaml", this::openapi);
 
     app.exception(
@@ -360,6 +367,52 @@ public final class SiaServer implements AutoCloseable {
     ctx.json(pluginView(plugin));
   }
 
+  private void workflows(Context ctx) {
+    try {
+      ctx.json(core.workflowNames());
+    } catch (java.io.IOException error) {
+      throw new IllegalStateException("falha ao listar workflows", error);
+    }
+  }
+
+  private void runWorkflow(Context ctx) {
+    String name = ctx.pathParam("name");
+    WorkflowInputsPayload payload = ctx.bodyAsClass(WorkflowInputsPayload.class);
+    try {
+      var run = core.runWorkflow(name, payload.inputs() == null ? Map.of() : payload.inputs());
+      ctx.status(202).json(workflowView(run));
+    } catch (java.io.IOException error) {
+      throw new IllegalArgumentException("workflow invalido: " + name);
+    }
+  }
+
+  private void workflowRuns(Context ctx) {
+    int limit = parseInt(ctx.queryParam("limit"), 20);
+    ctx.json(core.workflowRuns(limit).stream().map(this::workflowView).toList());
+  }
+
+  private void workflowRun(Context ctx) {
+    ctx.json(workflowView(core.workflowRun(ctx.pathParam("id"))));
+  }
+
+  private void resumeWorkflow(Context ctx) {
+    try {
+      ctx.json(workflowView(core.resumeWorkflow(ctx.pathParam("id"))));
+    } catch (java.io.IOException error) {
+      throw new IllegalArgumentException("nao foi possivel retomar: " + error.getMessage());
+    }
+  }
+
+  private Map<String, Object> workflowView(
+      com.accord.sia.core.workflow.WorkflowEngine.WorkflowRun run) {
+    Map<String, Object> view = new LinkedHashMap<>();
+    view.put("id", run.id());
+    view.put("name", run.name());
+    view.put("status", run.status());
+    view.put("nodes", run.nodeStatuses());
+    return view;
+  }
+
   private void schedules(Context ctx) {
     ctx.json(core.schedules().stream().map(this::scheduleView).toList());
   }
@@ -444,6 +497,9 @@ public final class SiaServer implements AutoCloseable {
       return fallback;
     }
   }
+
+  /** Corpo do {@code POST /api/workflows/{name}/runs}. */
+  public record WorkflowInputsPayload(Map<String, Object> inputs) {}
 
   /** Corpo do {@code POST /api/schedules}. */
   public record SchedulePayload(

@@ -22,7 +22,8 @@ public final class SchemaMigrator {
           "/schema/V1__init.sql",
           "/schema/V2__run_details.sql",
           "/schema/V3__idempotency.sql",
-          "/schema/V4__schedule_params.sql");
+          "/schema/V4__schedule_params.sql",
+          "/schema/V5__workflow_definition.sql");
 
   public void migrate(Database database) {
     try (Connection connection = database.connection()) {
