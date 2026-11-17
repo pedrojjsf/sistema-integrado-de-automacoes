@@ -97,12 +97,12 @@
 
   /* ---------------- login ---------------- */
 
-'  function showLogin(message) {
+  function showLogin(message) {
     // hidden + display inline: independe de qualquer regra de CSS carregada
     $("#app").hidden = true;
     $("#app").style.display = "none";
     $("#login").hidden = false;
-    $("#login").style.display = "grid";'
+    $("#login").style.display = "grid";
     if (message) {
       const error = $("#login-error");
       error.textContent = message;
@@ -110,11 +110,11 @@
     }
   }
 
-'  function startApp() {
+  function startApp() {
     $("#login").hidden = true;
     $("#login").style.display = "none";
     $("#app").hidden = false;
-    $("#app").style.display = "grid";'
+    $("#app").style.display = "grid";
     navigate(location.hash.replace("#/", "") || "painel");
   }
 

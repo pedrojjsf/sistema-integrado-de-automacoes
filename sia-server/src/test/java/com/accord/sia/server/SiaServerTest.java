@@ -99,6 +99,21 @@ class SiaServerTest {
   }
 
   @Test
+  void entregaScriptDaInterfaceIntegro() throws Exception {
+    HttpResponse<String> js = get("/app.js", "admin-token");
+
+    assertThat(js.statusCode()).isEqualTo(200);
+    assertThat(js.body()).contains("function startApp").contains("function showLogin");
+    // aspas soltas no inicio de linha ja quebraram o script inteiro (tela em branco)
+    assertThat(js.body().lines().noneMatch(line -> line.stripLeading().startsWith("'")))
+        .as("nenhuma linha pode comecar com apostrofo solto")
+        .isTrue();
+    long open = js.body().chars().filter(c -> c == '{').count();
+    long close = js.body().chars().filter(c -> c == '}').count();
+    assertThat(open).isEqualTo(close);
+  }
+
+  @Test
   void viewerLeCatalogoMasNaoExecuta() throws Exception {
     assertThat(get("/api/plugins", "viewer-token").statusCode()).isEqualTo(200);
     assertThat(get("/api/automations", "viewer-token").statusCode()).isEqualTo(200);
