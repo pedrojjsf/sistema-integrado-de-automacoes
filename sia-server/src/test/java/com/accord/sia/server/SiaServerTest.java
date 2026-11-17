@@ -84,6 +84,21 @@ class SiaServerTest {
   }
 
   @Test
+  void entregaFolhasDeEstiloValidas() throws Exception {
+    HttpResponse<String> css = get("/styles.css", "admin-token");
+
+    assertThat(css.statusCode()).isEqualTo(200);
+    assertThat(css.body()).startsWith(":root");
+    // aspas soltas ja quebraram o CSS inteiro uma vez: a regra de [hidden] ficou dentro
+    // de uma string aberta e o login nunca sumia.
+    assertThat(css.body()).doesNotContain("'");
+    assertThat(css.body()).contains("[hidden] { display: none !important; }");
+    long open = css.body().chars().filter(c -> c == '{').count();
+    long close = css.body().chars().filter(c -> c == '}').count();
+    assertThat(open).isEqualTo(close);
+  }
+
+  @Test
   void viewerLeCatalogoMasNaoExecuta() throws Exception {
     assertThat(get("/api/plugins", "viewer-token").statusCode()).isEqualTo(200);
     assertThat(get("/api/automations", "viewer-token").statusCode()).isEqualTo(200);
