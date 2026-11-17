@@ -23,11 +23,14 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class ProcessPluginTest {
 
-  @TempDir Path temp;
+  /**
+   * Diretorio fora do {@code @TempDir}: o processo filho usa o pacote como working directory e no
+   * Windows uma pasta que e cwd de processo vivo nao pode ser apagada.
+   */
+  private final Path temp = Path.of("target", "process-plugin-test");
 
   @Test
   void carregaExecutaEDesligaPluginDeProcesso() throws Exception {
