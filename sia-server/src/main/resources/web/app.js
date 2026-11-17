@@ -546,7 +546,7 @@
     let trigger;
     if (frequency === "interval") {
       const minutes = Number(data.get("minutes") || 15);
-      trigger = { type: "interval", seconds: minutes * 60 };
+      trigger = { type: "interval", every: minutes * 60 };
     } else if (frequency === "hourly") {
       trigger = { type: "cron", expression: "0 0 * * * ?" };
     } else {
