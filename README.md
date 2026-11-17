@@ -9,16 +9,41 @@ agenda execuções e orquestra tudo em **workflows** — sem conhecer a lógica 
 
 ## Rodar
 
+> Requer **JDK 23**. Se o `java` do PATH for outro (ex.: JRE 8), use o caminho completo do JDK,
+> por exemplo `"$env:JAVA_HOME\bin\java.exe"` no PowerShell.
+
 ```bash
 ./mvnw -DskipTests package
 
-# daemon (config de exemplo em config/local.yml)
+# daemon (config de exemplo em config/local.yml) — sobe em ~20 s
 java -jar sia-server/target/sia-server-1.0.0-SNAPSHOT-all.jar config/local.yml
 
-# cliente
+# cliente, em outro terminal
 java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token doctor
 java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token plugins
 java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token run receitanet.diag
+```
+
+### Adicionar um plugin
+
+```bash
+# 1. gerar e empacotar (o JAR sai com plugin.yml dentro)
+mvn archetype:generate -DinteractiveMode=false \
+  -DarchetypeGroupId=com.accord -DarchetypeArtifactId=sia-plugin-archetype \
+  -DarchetypeVersion=1.0.0-SNAPSHOT -DgroupId=com.accord.plugins \
+  -DartifactId=meu-plugin -Dversion=1.0.0 -DpluginId=meu-plugin \
+  -Dpackage=com.accord.plugins.meu
+cd meu-plugin && mvn package
+
+# 2. validar e instalar no daemon (sem reiniciar)
+curl -X POST localhost:8080/api/plugins/validate -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" -d "{\"path\":\"C:/caminho/meu-plugin-1.0.0.jar\"}"
+
+curl -X POST localhost:8080/api/plugins/install -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" -d "{\"path\":\"C:/caminho/meu-plugin-1.0.0.jar\"}"
+
+# 3. executar
+java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token plugins
 ```
 
 ## Escrever um plugin
