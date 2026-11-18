@@ -39,12 +39,21 @@ public final class SiaServer implements AutoCloseable {
   private final Authorizer authorizer = new Authorizer();
   private final Map<String, Principal> principals;
   private final String authMode;
+  private final Principal anonymous;
+  private final java.time.ZoneId zone;
   private final Javalin app;
 
-  private SiaServer(SiaCore core, Map<String, Principal> principals, String authMode) {
+  private SiaServer(
+      SiaCore core,
+      Map<String, Principal> principals,
+      String authMode,
+      Principal anonymous,
+      java.time.ZoneId zone) {
     this.core = core;
     this.principals = Map.copyOf(principals);
     this.authMode = authMode;
+    this.anonymous = anonymous;
+    this.zone = zone;
     this.app =
         Javalin.create(config -> {
           config.showJavalinBanner = false;
@@ -59,9 +68,20 @@ public final class SiaServer implements AutoCloseable {
 
   public static SiaServer create(SiaConfig config) throws IOException {
     String mode = config.auth().mode().toLowerCase(Locale.ROOT);
-    if (!"dev".equals(mode)) {
+    if (!"dev".equals(mode) && !"none".equals(mode)) {
       throw new IllegalStateException(
-          "auth.mode=" + mode + " ainda nao suportado; use dev ate a T11b (OIDC)");
+          "auth.mode=" + mode + " ainda nao suportado; use none (uso local) ou dev");
+    }
+    java.time.ZoneId zone = config.scheduler().zoneId();
+    if ("none".equals(mode)) {
+      // sem login: so aceitavel quando o daemon nao sai da maquina
+      if (!loopback(config.server().host())) {
+        throw new IllegalStateException(
+            "auth.mode=none exige bind em loopback (127.0.0.1/localhost); host atual: "
+                + config.server().host());
+      }
+      Principal local = Principal.user("local", "Operador local", Set.of(SiaRole.ADMIN));
+      return new SiaServer(coreWith(config), Map.of(), mode, local, zone);
     }
     Map<String, Principal> principals = new LinkedHashMap<>();
     config
@@ -72,7 +92,15 @@ public final class SiaServer implements AutoCloseable {
                 token,
                 Principal.user(
                     definition.subject(), definition.name(), roles(definition.roles()))));
-    return new SiaServer(coreWith(config), principals, mode);
+    return new SiaServer(coreWith(config), principals, mode, null, zone);
+  }
+
+  private static boolean loopback(String host) {
+    return host == null
+        || host.isBlank()
+        || "127.0.0.1".equals(host)
+        || "localhost".equalsIgnoreCase(host)
+        || "::1".equals(host);
   }
 
   private static SiaCore coreWith(SiaConfig config) throws IOException {
@@ -160,6 +188,13 @@ public final class SiaServer implements AutoCloseable {
           ctx.status(forbidden ? 403 : 401).json(Map.of("error", error.getMessage()));
         });
     app.exception(
+        io.javalin.http.BadRequestResponse.class,
+        (error, ctx) -> ctx.status(400).json(Map.of("error", "corpo da requisicao invalido")));
+    app.exception(
+        com.fasterxml.jackson.core.JsonProcessingException.class,
+        (error, ctx) ->
+            ctx.status(400).json(Map.of("error", "JSON invalido: " + error.getOriginalMessage())));
+    app.exception(
         IllegalStateException.class,
         (error, ctx) -> ctx.status(409).json(Map.of("error", error.getMessage())));
     app.exception(
@@ -173,16 +208,21 @@ public final class SiaServer implements AutoCloseable {
   }
 
   private void authorize(Context ctx, Permission read, Permission write) {
-    String token = bearer(ctx);
-    Principal principal =
-        principals.entrySet().stream()
-            .filter(entry -> constantTimeEquals(entry.getKey(), token))
-            .map(Map.Entry::getValue)
-            .findFirst()
-            .orElseThrow(() ->
-                new AuthorizationException(
-                    AuthorizationException.Reason.UNAUTHENTICATED, "token ausente ou invalido"));
-    Permission required = "POST".equalsIgnoreCase(ctx.method().name()) ? write : read;
+    Principal principal;
+    if ("none".equals(authMode)) {
+      principal = anonymous;
+    } else {
+      String token = bearer(ctx);
+      principal =
+          principals.entrySet().stream()
+              .filter(entry -> constantTimeEquals(entry.getKey(), token))
+              .map(Map.Entry::getValue)
+              .findFirst()
+              .orElseThrow(() ->
+                  new AuthorizationException(
+                      AuthorizationException.Reason.UNAUTHENTICATED, "token ausente ou invalido"));
+    }
+    Permission required = "GET".equalsIgnoreCase(ctx.method().name()) ? read : write;
     authorizer.require(principal, required);
     ctx.attribute("principal", principal);
   }
@@ -473,7 +513,7 @@ public final class SiaServer implements AutoCloseable {
     view.put("automation", schedule.target());
     view.put("trigger", schedule.trigger());
     view.put("enabled", schedule.enabled());
-    view.put("nextFireAt", schedule.nextFireAt() == null ? null : schedule.nextFireAt().toString());
+    view.put("nextFireAt", schedule.nextFireAt() == null ? null : instant(schedule.nextFireAt()));
     view.put("owner", schedule.owner());
     return view;
   }
@@ -509,8 +549,9 @@ public final class SiaServer implements AutoCloseable {
     return view;
   }
 
-  private static String instant(Instant instant) {
-    return instant == null ? null : instant.toString();
+  /** Instantes saem com o deslocamento do fuso configurado (Brasilia por padrao). */
+  private String instant(Instant instant) {
+    return instant == null ? null : java.time.OffsetDateTime.ofInstant(instant, zone).toString();
   }
 
   private static int parseInt(String value, int fallback) {

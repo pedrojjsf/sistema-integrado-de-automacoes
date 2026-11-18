@@ -65,8 +65,14 @@ O daemon serve a interface em **http://127.0.0.1:8080** (sem build, sem Node):
 | Fluxos | executar workflows e ver o status por etapa |
 | Plugins | habilitar, desabilitar e remover |
 
-'Na primeira visita a interface pede a **chave de acesso** (o token do `config/local.yml`).
-A linguagem visual está em [DESIGN.md](DESIGN.md).
+''Por padrão (`auth.mode: none`) a interface abre direto: a autenticação de verdade acontece dentro
+de cada automação — certificado digital, por exemplo. Para exigir chave de acesso, use
+`auth.mode: dev` com `auth.tokens` preenchido; aí a primeira visita pede a chave.
+
+Agendas e horários usam o fuso de `scheduler.zone` (`America/Sao_Paulo` por padrão), então
+"03:00" significa 03:00 de Brasília mesmo com o servidor em UTC.
+
+A linguagem visual está em [DESIGN.md](DESIGN.md).'
 
 ![Login](docs/screenshots/login.png)
 ![Painel](docs/screenshots/painel.png)'

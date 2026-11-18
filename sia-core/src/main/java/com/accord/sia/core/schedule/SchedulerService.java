@@ -48,6 +48,7 @@ public final class SchedulerService implements AutoCloseable {
   private final Launcher launcher;
   private final InProcessEventBus events;
   private final Clock clock;
+  private final ZoneId zone;
   private final ScheduledExecutorService timer =
       Executors.newScheduledThreadPool(
           1, Thread.ofPlatform().daemon(true).name("sia-scheduler").factory());
@@ -57,10 +58,20 @@ public final class SchedulerService implements AutoCloseable {
 
   public SchedulerService(
       ScheduleRepository repository, Launcher launcher, InProcessEventBus events, Clock clock) {
+    this(repository, launcher, events, clock, ZoneId.systemDefault());
+  }
+
+  public SchedulerService(
+      ScheduleRepository repository,
+      Launcher launcher,
+      InProcessEventBus events,
+      Clock clock,
+      ZoneId zone) {
     this.repository = repository;
     this.launcher = launcher;
     this.events = events;
     this.clock = clock;
+    this.zone = zone == null ? ZoneId.systemDefault() : zone;
   }
 
   /** Carrega os agendamentos existentes e arma os relogios. */
@@ -194,13 +205,14 @@ public final class SchedulerService implements AutoCloseable {
     };
   }
 
-  private static Instant nextCron(Trigger.Cron trigger, Instant after) {
-    ZoneId zone = trigger.zone() == null ? ZoneId.systemDefault() : ZoneId.of(trigger.zone());
+  private Instant nextCron(Trigger.Cron trigger, Instant after) {
+    // trigger.zone() e override explicito; sem ele vale o fuso configurado no SIA (Brasilia)
+    ZoneId effective = trigger.zone() == null ? zone : ZoneId.of(trigger.zone());
     CronParser parser =
         new CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.QUARTZ));
     Cron cron = parser.parse(normalize(trigger.expression())).validate();
     ExecutionTime execution = ExecutionTime.forCron(cron);
-    ZonedDateTime from = ZonedDateTime.ofInstant(after, zone);
+    ZonedDateTime from = ZonedDateTime.ofInstant(after, effective);
     Optional<ZonedDateTime> next = execution.nextExecution(from);
     return next.map(ZonedDateTime::toInstant).orElse(null);
   }

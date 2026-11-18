@@ -15,7 +15,18 @@ public record SiaConfig(
     Database database,
     Plugins plugins,
     Auth auth,
+    Scheduler scheduler,
     Map<String, ProcessSpec> processes) {
+
+  /** Compatibilidade: sem a secao {@code scheduler}, o fuso padrao e o de Brasilia. */
+  public SiaConfig(
+      Server server,
+      Database database,
+      Plugins plugins,
+      Auth auth,
+      Map<String, ProcessSpec> processes) {
+    this(server, database, plugins, auth, null, processes);
+  }
 
   public record Server(String host, int port) {
 
@@ -54,6 +65,24 @@ public record SiaConfig(
     }
   }
 
+  /**
+   * Fuso do SIA. Usado para avaliar cron e para devolver horarios na API, para que a agenda das
+   * 03:00 signifique 03:00 de Brasilia em qualquer maquina — servidor em UTC inclusive.
+   *
+   * @param zone identificador IANA; padrao {@code America/Sao_Paulo}
+   */
+  public record Scheduler(String zone) {
+
+    public Scheduler {
+      zone = zone == null || zone.isBlank() ? "America/Sao_Paulo" : zone;
+      java.time.ZoneId.of(zone); // valida cedo, em vez de falhar no meio de um disparo
+    }
+
+    public java.time.ZoneId zoneId() {
+      return java.time.ZoneId.of(zone);
+    }
+  }
+
   /** Comando base de um executavel permitido, resolvido por nome logico. */
   public record ProcessSpec(
       List<String> command, @JsonProperty("timeout-minutes") Integer timeoutMinutes) {
@@ -69,10 +98,11 @@ public record SiaConfig(
     database = database == null ? new Database(null) : database;
     plugins = plugins == null ? new Plugins(null) : plugins;
     auth = auth == null ? new Auth(null, Map.of()) : auth;
+    scheduler = scheduler == null ? new Scheduler(null) : scheduler;
     processes = processes == null ? Map.of() : Map.copyOf(processes);
   }
 
   public static SiaConfig defaults() {
-    return new SiaConfig(null, null, null, null, Map.of());
+    return new SiaConfig(null, null, null, null, null, Map.of());
   }
 }

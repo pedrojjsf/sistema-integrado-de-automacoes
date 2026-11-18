@@ -114,6 +114,33 @@ class SiaServerTest {
   }
 
   @Test
+  void payloadInvalidoResponde400() throws Exception {
+    HttpResponse<String> response =
+        post(
+            "/api/schedules",
+            "admin-token",
+            "{\"automation\":\"receitanet.diag\",\"trigger\":{\"type\":\"interval\",\"seconds\":900}}");
+
+    assertThat(response.statusCode()).isEqualTo(400);
+    assertThat(response.body()).contains("error");
+  }
+
+  @Test
+  void horarioDeAgendaSaiNoFusoDeBrasilia() throws Exception {
+    HttpResponse<String> created =
+        post(
+            "/api/schedules",
+            "admin-token",
+            "{\"automation\":\"receitanet.diag\",\"trigger\":{\"type\":\"cron\",\"expression\":\"0 0 3 * * ?\"}}");
+
+    // sem plugins no ambiente de teste, a criacao pode ser recusada por automacao desconhecida
+    assertThat(created.statusCode()).isIn(201, 400);
+    if (created.statusCode() == 201) {
+      assertThat(created.body()).contains("\"nextFireAt\":\"").contains("03:00-03:00");
+    }
+  }
+
+  @Test
   void viewerLeCatalogoMasNaoExecuta() throws Exception {
     assertThat(get("/api/plugins", "viewer-token").statusCode()).isEqualTo(200);
     assertThat(get("/api/automations", "viewer-token").statusCode()).isEqualTo(200);

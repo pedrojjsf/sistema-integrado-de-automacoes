@@ -5,6 +5,7 @@
   const TOKEN_KEY = "sia.token";
   const TERMINAL = new Set(["SUCCESS", "FAILURE", "SKIPPED", "CANCELLED"]);
   const state = { token: localStorage.getItem(TOKEN_KEY) || "", view: "painel", health: null, timer: null };
+  let authMode = null;
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -38,7 +39,12 @@
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     if (response.status === 401 || response.status === 403) {
-      if (response.status === 401) showLogin("Chave inválida ou expirada.");
+      // auth.mode=none nao tem login: 403 ali e permissao de papel, nao sessao
+      if (response.status === 401 && authMode !== "none") {
+        state.token = "";
+        localStorage.removeItem(TOKEN_KEY);
+        showLogin("Sessão expirada. Entre novamente.");
+      }
       throw new Error("sem permissão para esta ação");
     }
     const text = await response.text();
@@ -115,6 +121,12 @@
     $("#login").style.display = "none";
     $("#app").hidden = false;
     $("#app").style.display = "grid";
+    if (authMode === "none") {
+      const logout = $("#logout");
+      if (logout) logout.hidden = true;
+      const label = $("#conn-label");
+      if (label) label.textContent = "acesso local";
+    }
     navigate(location.hash.replace("#/", "") || "painel");
   }
 
@@ -730,9 +742,25 @@
 
   /* ---------------- boot ---------------- */
 
-  if (state.token) {
-    api("/api/health").then(startApp).catch(() => showLogin("Sessão expirada. Entre novamente."));
-  } else {
+  async function boot() {
+    try {
+      const health = await api("/api/health");
+      state.health = health;
+      authMode = health.auth;
+      // sem login configurado: entra direto
+      if (authMode === "none") {
+        startApp();
+        return;
+      }
+      if (state.token) {
+        startApp();
+        return;
+      }
+    } catch (error) {
+      // 401 esperado quando auth=dev e ainda nao ha chave
+    }
     showLogin();
   }
+
+  boot();
 })();

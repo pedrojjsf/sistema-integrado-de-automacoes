@@ -1,96 +1,422 @@
 openapi: 3.0.3
 info:
-  title: Sistema Integrado de Automações (SIA)
+  title: SIA — Sistema Integrado de Automações
   version: 1.0.0
   description: |
-    API do daemon. Autenticação por bearer token; papéis viewer, operator e admin.
-    Regra da casa: parâmetros entram como nome (nunca valor sensível) e saídas como chave.
+    API do daemon do SIA. Cobre catálogo de automações, execução, histórico,
+    agendamentos, workflows e administração de plugins.
+
+    **Autenticação:** depende de `auth.mode` no `config.yml`.
+
+    - `none` — sem login, aceito apenas com bind em loopback. A autenticação real
+      acontece dentro de cada automação (por exemplo, certificado digital).
+    - `dev` — exige `Authorization: Bearer <chave>` com uma das chaves de `auth.tokens`.
+
+    **Fuso:** horários são devolvidos com o deslocamento de `scheduler.zone`
+    (padrão `America/Sao_Paulo`, ex.: `2026-11-18T03:00:00-03:00`).
 servers:
   - url: http://127.0.0.1:8080
-security:
-  - bearer: []
+    description: daemon local
+tags:
+  - name: painel
+  - name: plugins
+  - name: automacoes
+  - name: execucoes
+  - name: agendas
+  - name: workflows
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        version:
+          type: string
+          example: 1.0.0
+        auth:
+          type: string
+          enum: [none, dev]
+        plugins:
+          type: integer
+          description: plugins carregados
+        running:
+          type: integer
+          description: execuções em andamento
+        failures:
+          type: array
+          items:
+            type: string
+    Param:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [STRING, INTEGER, BOOLEAN, PATH, CHOICE]
+        required:
+          type: boolean
+        sensitive:
+          type: boolean
+    Automation:
+      type: object
+      properties:
+        id:
+          type: string
+          example: receitanet.diag
+        name:
+          type: string
+        description:
+          type: string
+        persistOutputs:
+          type: boolean
+        params:
+          type: array
+          items:
+            $ref: '#/components/schemas/Param'
+    Plugin:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        state:
+          type: string
+          enum: [DISCOVERED, VALIDATED, LOADED, INITIALIZED, ENABLED, DISABLED, UNLOADED, FAILED]
+        automations:
+          type: array
+          items:
+            type: string
+    Run:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        plugin:
+          type: string
+        automation:
+          type: string
+        actor:
+          type: string
+          description: quem executou (subject); `system:scheduler` e `system:workflow` em disparo automático
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, SUCCESS, FAILURE, SKIPPED, CANCELLED]
+        startedAt:
+          type: string
+          nullable: true
+          example: '2026-11-18T03:00:00-03:00'
+        finishedAt:
+          type: string
+          nullable: true
+        trigger:
+          type: string
+          enum: [api, schedule, workflow, manual]
+        errorCode:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+        params:
+          type: array
+          description: apenas os nomes dos parâmetros; valores não são persistidos
+          items:
+            type: string
+        outputs:
+          type: array
+          description: apenas as chaves de saída
+          items:
+            type: string
+    Trigger:
+      type: object
+      description: |
+        `cron` usa expressão de 6 campos (Quartz) avaliada em `scheduler.zone`;
+        `interval` em segundos; `event` dispara por evento interno.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [cron, interval, event]
+        expression:
+          type: string
+          description: obrigatório para `cron`
+          example: 0 0 3 * * ?
+        zone:
+          type: string
+          description: opcional; sobrepõe `scheduler.zone`
+          example: America/Sao_Paulo
+        every:
+          type: integer
+          description: obrigatório para `interval`, em segundos
+          example: 900
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        automation:
+          type: string
+        trigger:
+          $ref: '#/components/schemas/Trigger'
+        enabled:
+          type: boolean
+        nextFireAt:
+          type: string
+          nullable: true
+          example: '2026-11-19T03:00:00-03:00'
+        owner:
+          type: string
+    WorkflowRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [RUNNING, SUCCESS, PARTIAL, FAILURE]
+        nodes:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [PENDING, RUNNING, DONE, FAILED, SKIPPED]
+  parameters:
+    PluginId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+    RunId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    ScheduleId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    BadRequest:
+      description: requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  requestBodies:
+    PluginPath:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [path]
+            properties:
+              path:
+                type: string
+                example: C:/build/meu-plugin-1.0.0.jar
 paths:
+  /:
+    get:
+      tags: [painel]
+      summary: Redireciona para a interface web
+      responses:
+        '302':
+          description: Location /index.html
   /api/health:
     get:
+      tags: [painel]
       summary: Estado do daemon
       responses:
-        "200": { description: ok }
-        "401": { description: sem token válido }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
   /api/plugins:
     get:
-      summary: Lista plugins carregados
+      tags: [plugins]
+      summary: Lista plugins e seus estados
       responses:
-        "200": { description: lista }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Plugin'
   /api/plugins/{id}:
     get:
+      tags: [plugins]
       summary: Detalhe de um plugin
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/PluginId'
       responses:
-        "200": { description: plugin }
-        "400": { description: desconhecido }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plugin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/plugins/validate:
     post:
-      summary: Valida um pacote sem instalar (admin)
+      tags: [plugins]
+      summary: Valida um JAR sem instalar
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PluginPath" }
+        $ref: '#/components/requestBodies/PluginPath'
       responses:
-        "200": { description: resultado da validação }
+        '200':
+          description: manifesto válido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: string}
+                  version: {type: string}
+                  kind: {type: string, enum: [java, process]}
+                  mainClassPresent: {type: boolean}
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/plugins/install:
     post:
-      summary: Instala, carrega e habilita um plugin (admin)
+      tags: [plugins]
+      summary: Instala, carrega e habilita um plugin
+      description: O caminho precisa existir no host do daemon.
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PluginPath" }
+        $ref: '#/components/requestBodies/PluginPath'
       responses:
-        "201": { description: plugin habilitado }
-        "400": { description: pacote inválido }
+        '200':
+          description: plugin instalado e habilitado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plugin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/plugins/{id}/enable:
     post:
-      summary: Habilita plugin (admin)
+      tags: [plugins]
+      summary: Habilita o plugin (persistido)
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/PluginId'
       responses:
-        "200": { description: plugin }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plugin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/plugins/{id}/disable:
     post:
-      summary: Desabilita plugin (admin)
+      tags: [plugins]
+      summary: Desabilita o plugin (persistido; execuções passam a responder 409)
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/PluginId'
       responses:
-        "200": { description: plugin }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plugin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/plugins/{id}/reload:
     post:
-      summary: Recarrega plugin do disco (admin)
+      tags: [plugins]
+      summary: Recarrega o plugin a partir do disco
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/PluginId'
       responses:
-        "200": { description: plugin }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plugin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/plugins/{id}/uninstall:
+    post:
+      tags: [plugins]
+      summary: Descarrega, apaga os arquivos e remove o estado
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uninstalled: {type: string}
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/automations:
     get:
-      summary: Catálogo de automações
+      tags: [automacoes]
+      summary: Catálogo de automações com parâmetros
       responses:
-        "200": { description: lista }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Automation'
   /api/runs:
     get:
-      summary: Execuções recentes
+      tags: [execucoes]
+      summary: Últimas execuções
       parameters:
-        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+        - name: limit
+          in: query
+          schema: {type: integer, default: 20, maximum: 100}
       responses:
-        "200": { description: lista }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Run'
     post:
-      summary: Cria uma execução (operator)
+      tags: [execucoes]
+      summary: Executa uma automação
       parameters:
         - name: Idempotency-Key
           in: header
-          required: false
-          schema: { type: string }
-          description: Mesma chave devolve o mesmo runId, sem duplicar execução.
+          schema: {type: string}
+          description: repetir a mesma chave devolve a execução original
       requestBody:
         required: true
         content:
@@ -99,53 +425,254 @@ paths:
               type: object
               required: [automation]
               properties:
-                automation: { type: string, example: receitanet.diag }
-                params: { type: object, additionalProperties: true }
+                automation: {type: string, example: receitanet.diag}
+                params:
+                  type: object
+                  additionalProperties: true
       responses:
-        "202": { description: aceito, devolve runId }
-        "400": { description: automação desconhecida }
-        "403": { description: papel sem permissão }
+        '202':
+          description: aceito
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runId: {type: string, format: uuid}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: plugin desabilitado ou sem permissão de estado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/runs/{id}:
     get:
+      tags: [execucoes]
       summary: Detalhe de uma execução
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/RunId'
       responses:
-        "200": { description: execução }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/runs/{id}/cancel:
+    post:
+      tags: [execucoes]
+      summary: Pede cancelamento cooperativo da execução
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cancelled: {type: boolean}
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/runs/{id}/logs:
     get:
-      summary: Log da execução (sem dado sensível)
+      tags: [execucoes]
+      summary: Log da execução (valores sensíveis redigidos)
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/RunId'
       responses:
-        "200": { description: linhas }
+        '200':
+          description: linhas de log
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {type: string}
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /api/runs/{id}/events:
     get:
-      summary: Stream SSE de progresso
-      description: Eventos `ready`, `log`, `progress`, `step`, `ping` e `finished`.
+      tags: [execucoes]
+      summary: Stream SSE do ciclo de vida de uma execução
+      description: |
+        Envia `event: ready` ao conectar e, para esta execução, `event: started` e
+        `event: finished` com o status.
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/RunId'
       responses:
-        "200":
+        '200':
           description: text/event-stream
           content:
             text/event-stream:
-              schema: { type: string }
-  /api/runs/{id}/cancel:
-    post:
-      summary: Pede cancelamento (operator)
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+              schema:
+                type: string
+  /api/schedules:
+    get:
+      tags: [agendas]
+      summary: Lista agendamentos
       responses:
-        "200": { description: "{cancelled: boolean}" }
-components:
-  securitySchemes:
-    bearer:
-      type: http
-      scheme: bearer
-  schemas:
-    PluginPath:
-      type: object
-      required: [path]
-      properties:
-        path: { type: string, description: caminho do JAR no host do daemon }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Schedule'
+    post:
+      tags: [agendas]
+      summary: Cria agendamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [automation, trigger]
+              properties:
+                automation: {type: string}
+                trigger:
+                  $ref: '#/components/schemas/Trigger'
+                params:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '201':
+          description: criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/schedules/{id}/enable:
+    post:
+      tags: [agendas]
+      summary: Retoma um agendamento
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '200':
+          description: ok
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/schedules/{id}/disable:
+    post:
+      tags: [agendas]
+      summary: Pausa um agendamento
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '200':
+          description: ok
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/schedules/{id}:
+    delete:
+      tags: [agendas]
+      summary: Remove um agendamento
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '200':
+          description: ok
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/workflows:
+    get:
+      tags: [workflows]
+      summary: Nomes de workflows disponíveis
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {type: string}
+  /api/workflows/{name}/runs:
+    post:
+      tags: [workflows]
+      summary: Executa um workflow
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                inputs:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '202':
+          description: aceito
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/workflows/runs:
+    get:
+      tags: [workflows]
+      summary: Execuções de workflow recentes
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkflowRun'
+  /api/workflows/runs/{id}:
+    get:
+      tags: [workflows]
+      summary: Detalhe de uma execução de workflow
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/workflows/runs/{id}/resume:
+    post:
+      tags: [workflows]
+      summary: Retoma um workflow interrompido (nós concluídos não repetem)
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '202':
+          description: aceito
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /openapi.yaml:
+    get:
+      tags: [painel]
+      summary: Esta especificação
+      responses:
+        '200':
+          description: ok
+          content:
+            application/yaml:
+              schema:
+                type: string

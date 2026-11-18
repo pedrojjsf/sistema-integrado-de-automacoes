@@ -102,6 +102,38 @@ class SchedulerServiceTest {
   }
 
   @Test
+  void cronUsaFusoDeBrasiliaPorPadrao() {
+    SchedulerService brasilia =
+        new SchedulerService(
+            repository,
+            (schedule, fireTime) -> launches.add(schedule),
+            events,
+            Clock.systemUTC(),
+            java.time.ZoneId.of("America/Sao_Paulo"));
+
+    // 03:00 em Brasilia (UTC-3) equivale a 06:00 UTC
+    Instant next =
+        brasilia.nextAfter(
+            new Trigger.Cron("0 0 3 * * ?"),
+            Instant.parse("2026-11-18T12:00:00Z"),
+            Instant.parse("2026-11-18T12:00:00Z"));
+
+    assertThat(next).isEqualTo(Instant.parse("2026-11-19T06:00:00Z"));
+    brasilia.close();
+  }
+
+  @Test
+  void zonaExplicitaNoTriggerSobrepoeOFusoPadrao() {
+    Instant next =
+        scheduler.nextAfter(
+            new Trigger.Cron("0 0 3 * * ?", "UTC"),
+            Instant.parse("2026-11-18T12:00:00Z"),
+            Instant.parse("2026-11-18T12:00:00Z"));
+
+    assertThat(next).isEqualTo(Instant.parse("2026-11-19T03:00:00Z"));
+  }
+
+  @Test
   void desabilitarCancelaProximoDisparo() throws Exception {
     Schedule schedule =
         scheduler.create(

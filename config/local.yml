@@ -9,14 +9,16 @@ database:
 plugins:
   directory: plugins
 
+# Fuso do SIA: agenda e horarios exibidos usam Brasilia.
+scheduler:
+  zone: America/Sao_Paulo
+
 auth:
-  # dev: token estatico. O daemon recusa este modo em producao.
-  mode: dev
-  tokens:
-    dev-token:
-      subject: sub-dev
-      name: Desenvolvedor
-      roles: [admin]
+  # none: sem login. Só é aceito com bind em loopback (127.0.0.1/localhost).
+  # A autenticação de verdade acontece dentro de cada automação (ex.: certificado digital).
+  # Para exigir chave, use mode: dev e preencha tokens.
+  mode: none
+  tokens: {}
 
 processes:
   receitanet-bx:
