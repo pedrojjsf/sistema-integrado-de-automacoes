@@ -4,7 +4,32 @@
 
   const TOKEN_KEY = "sia.token";
   const TERMINAL = new Set(["SUCCESS", "FAILURE", "SKIPPED", "CANCELLED"]);
-  const state = { token: localStorage.getItem(TOKEN_KEY) || "", view: "painel", health: null, timer: null };
+
+  /**
+   * Tipos do contrato, gerados de openapi.yaml em types/api.d.ts.
+   * @typedef {import("@tipos/api").Health} Health
+   * @typedef {import("@tipos/api").Plugin} Plugin
+   * @typedef {import("@tipos/api").Automation} Automation
+   * @typedef {import("@tipos/api").Run} Run
+   * @typedef {import("@tipos/api").Schedule} Schedule
+   */
+
+  /**
+   * @type {{
+   *   token: string,
+   *   view: string,
+   *   health: Health | null,
+   *   timer: number,
+   *   panel: null | { plugin: Plugin, frame: HTMLIFrameElement, automation: Automation | null }
+   * }}
+   */
+  const state = {
+    token: localStorage.getItem(TOKEN_KEY) || "",
+    view: "painel",
+    health: null,
+    timer: 0,
+    panel: null,
+  };
   let authMode = null;
 
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -66,8 +91,8 @@
   const shortId = (id) => (id ? `${id.slice(0, 8)}…` : "—");
   const duration = (run) => {
     if (!run.startedAt) return "—";
-    const end = run.finishedAt ? new Date(run.finishedAt) : new Date();
-    const ms = Math.max(0, end - new Date(run.startedAt));
+    const end = run.finishedAt ? new Date(run.finishedAt).getTime() : Date.now();
+    const ms = Math.max(0, end - new Date(run.startedAt).getTime());
     return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
   };
 
@@ -187,7 +212,8 @@
     try {
       state.health = await api("/api/health");
       dot.className = "status-dot on";
-      label.textContent = `v${state.health.version} · ${state.health.auth}`;
+      const health = state.health;
+      label.textContent = health ? `v${health.version} · ${health.auth}` : "conectado";
     } catch {
       dot.className = "status-dot off";
       label.textContent = "sem conexão";
@@ -258,6 +284,7 @@
     );
   }
 
+  /** @param {Run[]} runs */
   function runsTable(runs) {
     return h(
       "table",
@@ -284,12 +311,14 @@
     const content = $("#content");
     content.replaceChildren(h("div", { class: "empty" }, "Carregando catálogo…"));
     try {
-      const [automations, plugins] = await Promise.all([api("/api/automations"), api("/api/plugins")]);
+      const [automations, plugins] = /** @type {[Automation[], Plugin[]]} */ (
+        await Promise.all([api("/api/automations"), api("/api/plugins")])
+      );
       // a automacao pode nao ter o prefixo do id do plugin (hello.say -> hello-plugin):
       // o vinculo correto vem da lista de automacoes publicada por cada plugin
       const byAutomation = new Map();
       for (const plugin of plugins) {
-        for (const automationId of plugin.automations) byAutomation.set(automationId, plugin);
+        for (const automationId of plugin.automations || []) byAutomation.set(automationId, plugin);
       }
       if (automations.length === 0) {
         content.replaceChildren(h("div", { class: "empty" }, "Nenhuma automação instalada ainda."));
@@ -305,10 +334,14 @@
     }
   }
 
+  /**
+   * @param {Automation} automation
+   * @param {Plugin | undefined} plugin
+   */
   function automationCard(automation, plugin) {
     const disabled = !plugin || plugin.state !== "ENABLED";
     const hasPanel = Boolean(plugin && plugin.ui);
-    const paramCount = automation.params.length;
+    const paramCount = (automation.params || []).length;
     return h(
       "article",
       { class: "card" },
@@ -328,25 +361,30 @@
           class: "btn btn-primary btn-sm",
           type: "button",
           disabled,
-          onclick: () => (hasPanel ? openPluginPanel(plugin, automation) : openRunForm(automation)),
+          onclick: () => (hasPanel ? openPluginPanel(/** @type {Plugin} */ (plugin), automation) : openRunForm(automation)),
         }, hasPanel ? "Abrir painel" : "Executar")),
     );
   }
 
   /* ---------------- painel do plugin ---------------- */
 
+  /**
+   * @param {Plugin} plugin
+   * @param {Automation | null} automation
+   */
   function openPluginPanel(plugin, automation) {
     const frame = $("#panel-frame");
     $("#panel-eyebrow").textContent = `${plugin.name} · v${plugin.version}`;
     $("#panel-title").textContent = automation ? automation.name || automation.id : plugin.name;
+    const ui = plugin.ui || { entry: "", width: 560, height: 460 };
     const window_ = $(".panel-window");
-    window_.style.setProperty("--panel-w", `${plugin.ui.width}px`);
-    window_.style.setProperty("--panel-h", `${plugin.ui.height}px`);
+    window_.style.setProperty("--panel-w", `${ui.width}px`);
+    window_.style.setProperty("--panel-h", `${ui.height}px`);
     $("#panel").hidden = false;
     document.body.style.overflow = "hidden";
     state.panel = { plugin, frame, automation };
     frame.onload = () => sendToPanel({ type: "sia:init", plugin: { id: plugin.id, name: plugin.name }, automation });
-    frame.src = `/api/plugins/${encodeURIComponent(plugin.id)}/ui/${plugin.ui.entry}`;
+    frame.src = `/api/plugins/${encodeURIComponent(String(plugin.id))}/ui/${ui.entry}`;
   }
 
   function sendToPanel(message) {
@@ -664,7 +702,7 @@
     } else if (frequency === "hourly") {
       trigger = { type: "cron", expression: "0 0 * * * ?" };
     } else {
-      trigger = { type: "cron", expression: (data.get("cron") || "").trim() || "0 0 3 * * ?" };
+      trigger = { type: "cron", expression: String(data.get("cron") || "").trim() || "0 0 3 * * ?" };
     }
     try {
       await api("/api/schedules", { method: "POST", body: { automation, trigger, params: {} } });
@@ -830,8 +868,9 @@
   }
 
   document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-close='drawer']")) closeDrawer();
-    if (event.target.closest("[data-close='panel']")) closePanel();
+    const target = /** @type {HTMLElement} */ (event.target);
+    if (target.closest("[data-close='drawer']")) closeDrawer();
+    if (target.closest("[data-close='panel']")) closePanel();
   });
 
   document.addEventListener("keydown", (event) => {

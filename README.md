@@ -95,6 +95,28 @@ mvn archetype:generate -DinteractiveMode=false \
 
 O projeto gerado compila e testa com o `PluginTestKit` sem edição.
 
+## Verificação de tipos do frontend (opcional)
+
+O console não tem build: `app.js` é servido como está. Para pegar erro de nome de campo, uso
+indevido de `null` e divergência com a API antes de abrir o navegador, há checagem de tipos com
+JSDoc + TypeScript.
+
+```bat
+npm install          :: uma vez (só typescript)
+npm run check        :: tsc -p tsconfig.json
+```
+
+Os tipos vêm do contrato: [types/api.d.ts](types/api.d.ts) é **gerado** de
+[sia-server/src/main/resources/openapi.yaml](sia-server/src/main/resources/openapi.yaml) por um
+gerador Java — sem Node no build. Se o `openapi.yaml` mudar, o teste `ApiTypesUpToDateTest` falha e
+pede a regeração:
+
+```bat
+npm run types
+```
+
+`mvnw clean verify` continua sem precisar de Node — o Node só é necessário para essa verificação.
+
 ## Módulos
 
 | Módulo | Papel |

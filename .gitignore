@@ -34,3 +34,4 @@ automacao/ReceitanetBX-Bot/*.exe
 erros/
 *.log.*
 *.lck
+node_modules/

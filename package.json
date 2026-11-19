@@ -1,0 +1,13 @@
+{
+  "name": "sia-web",
+  "private": true,
+  "description": "Verificação de tipos do frontend do SIA (opcional: o build Java não depende de Node).",
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "types": "mvnw.cmd -q -pl sia-server test -Dtest=ApiTypesUpToDateTest -Dsia.types.write=true"
+  },
+  "devDependencies": {
+    "typescript": "5.7.2"
+  }
+}

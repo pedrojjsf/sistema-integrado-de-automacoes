@@ -101,6 +101,18 @@ components:
           type: array
           items:
             type: string
+        ui:
+          type: object
+          nullable: true
+          description: interface própria do plugin, quando declarada no manifesto
+          properties:
+            entry:
+              type: string
+              example: ui/panel.html
+            width:
+              type: integer
+            height:
+              type: integer
     Run:
       type: object
       properties:
