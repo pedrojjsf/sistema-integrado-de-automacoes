@@ -87,6 +87,7 @@ components:
             $ref: '#/components/schemas/Param'
     Plugin:
       type: object
+      required: [id, name, version, state, automations, ui]
       properties:
         id:
           type: string
@@ -103,8 +104,8 @@ components:
             type: string
         ui:
           type: object
-          nullable: true
-          description: interface própria do plugin, quando declarada no manifesto
+          description: interface própria do plugin (obrigatória no manifesto)
+          required: [entry, width, height]
           properties:
             entry:
               type: string

@@ -59,7 +59,7 @@ O daemon serve a interface em **http://127.0.0.1:8080** (sem build, sem Node):
 | Tela | Para quê |
 |---|---|
 | Painel | execuções em andamento, plugins ativos, falhas recentes |
-| Automações | catálogo com formulário gerado **ou painel próprio do plugin** (como a janela de um plugin de áudio) |
+| Automações | catálogo onde cada plugin abre o **próprio painel** (como a janela de um plugin de áudio). A interface é obrigatória: o console só desenha a moldura |
 | Histórico | últimas execuções com status, duração, ator e log |
 | Agendas | criar/pausar/remover execuções automáticas |
 | Fluxos | executar workflows e ver o status por etapa |
@@ -72,7 +72,7 @@ de cada automação — certificado digital, por exemplo. Para exigir chave de a
 Agendas e horários usam o fuso de `scheduler.zone` (`America/Sao_Paulo` por padrão), então
 "03:00" significa 03:00 de Brasília mesmo com o servidor em UTC.
 
-A linguagem visual está em [DESIGN.md](DESIGN.md). O plugin pode trazer a própria tela
+A linguagem visual está em [DESIGN.md](DESIGN.md). **Todo plugin traz a própria tela**
 ([docs/PLUGIN_UI.md](docs/PLUGIN_UI.md)): o console abre a página dele num painel isolado e conversa
 por mensagens — o resultado volta com valores, mas o histórico continua guardando só as chaves.
 

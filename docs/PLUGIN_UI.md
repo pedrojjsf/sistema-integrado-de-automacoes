@@ -19,13 +19,20 @@ moldura, entrega os dados e recebe o pedido de execução; o desenho é do plugi
 └──────────────────────────────────────────────┘
 ```
 
-## Quando usar
+## Obrigatória desde a v1
+
+Todo plugin declara `ui`. Não existe mais o formulário gerado pelo console: se o plugin não trouxer
+a página, o manifesto é recusado no carregamento com
+
+```
+ui: obrigatorio: declare ui.entry com a pagina do plugin (ex.: ui/panel.html)
+```
 
 | Situação | Interface |
 |---|---|
-| 1–3 campos, sem decisão | formulário gerado (padrão) |
-| escolher arquivo, prévia, tabela, etapas, botões diferentes | **painel próprio** |
-| automação disparada só por agenda | nenhuma das duas |
+| 1–3 campos, sem decisão | painel próprio simples (como o `hello-plugin`) |
+| escolher arquivo, prévia, tabela, etapas | painel próprio completo |
+| automação disparada só por agenda | painel mínimo, só para execução manual |
 
 ## Declarar no manifesto
 

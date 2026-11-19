@@ -98,8 +98,9 @@ public List<Automation> automations() {
 Guarde o `PluginContext` no `initialize` e passe adiante. Nunca use `static` mutável — o mesmo plugin
 pode rodar duas execuções ao mesmo tempo.
 
-## 9. Painel próprio (interface do plugin)
+## 9. Painel próprio (obrigatório em todo plugin)
 
+Toda automação aparece na interface pela tela do próprio plugin — o console não gera mais formulário.
 Ver [PLUGIN_UI.md](PLUGIN_UI.md). Resumo:
 
 ```yaml

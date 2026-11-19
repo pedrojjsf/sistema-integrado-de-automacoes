@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>${pluginId} — painel</title>
+    <style>
+      :root { --ink: #171a1f; --soft: #4c525c; --line: #e2ded6; --primary: #0e5a5e; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 18px; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fff; }
+      h1 { font-size: 15px; margin: 0 0 4px; }
+      p { margin: 0 0 16px; color: var(--soft); font-size: 12.5px; }
+      label { display: grid; gap: 5px; margin-bottom: 12px; }
+      label span { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+      input { height: 34px; border: 1px solid var(--line); border-radius: 6px; padding: 0 9px; font: inherit; }
+      button { height: 34px; padding: 0 14px; border: 1px solid var(--primary); border-radius: 6px; background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+      .out { margin-top: 16px; border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-height: 60px; background: #faf9f6; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>${pluginId}</h1>
+    <p>Esta tela é do plugin: o SIA abre a moldura e executa a automação.</p>
+
+    <label>
+      <span>Texto</span>
+      <input id="texto" value="ola" autocomplete="off" />
+    </label>
+
+    <button id="go" type="button">Executar</button>
+
+    <div class="out" id="out">O resultado aparece aqui.</div>
+
+    <script>
+      var go = document.getElementById("go");
+      var out = document.getElementById("out");
+
+      go.addEventListener("click", function () {
+        go.disabled = true;
+        out.textContent = "executando...";
+        parent.postMessage(
+          {
+            type: "sia:execute",
+            automation: "${pluginId}.echo",
+            params: { texto: document.getElementById("texto").value },
+          },
+          "*"
+        );
+      });
+
+      addEventListener("message", function (event) {
+        var message = event.data || {};
+        if (message.type !== "sia:result") return;
+        go.disabled = false;
+        var ok = message.status === "SUCCESS";
+        out.textContent = ok
+          ? "SUCCESS: " + JSON.stringify(message.outputs)
+          : "FALHA (" + (message.errorCode || "-") + "): " + (message.message || "");
+      });
+    </script>
+  </body>
+</html>

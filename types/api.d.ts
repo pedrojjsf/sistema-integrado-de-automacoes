@@ -35,12 +35,12 @@ export interface Automation {
 }
 
 export interface Plugin {
-  id?: string;
-  name?: string;
-  version?: string;
-  state?: "DISCOVERED" | "VALIDATED" | "LOADED" | "INITIALIZED" | "ENABLED" | "DISABLED" | "UNLOADED" | "FAILED";
-  automations?: string[];
-  ui?: { entry: string; width: number; height: number } | null;
+  id: string;
+  name: string;
+  version: string;
+  state: "DISCOVERED" | "VALIDATED" | "LOADED" | "INITIALIZED" | "ENABLED" | "DISABLED" | "UNLOADED" | "FAILED";
+  automations: string[];
+  ui: { entry: string; width: number; height: number };
 }
 
 export interface Run {

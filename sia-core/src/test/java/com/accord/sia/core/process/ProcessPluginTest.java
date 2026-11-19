@@ -84,9 +84,15 @@ class ProcessPluginTest {
         api-version: "1.0"
         kind: process
         command: ["java", "-cp", "%s", "com.accord.sia.core.process.JsonlTestPlugin"]
+        ui:
+          entry: ui/panel.html
         """
             .formatted(testClasses));
     Files.write(directory.resolve("plugin.jar"), new byte[] {0});
+    java.nio.file.Files.createDirectories(directory.resolve("ui"));
+    java.nio.file.Files.writeString(
+        directory.resolve("ui").resolve("panel.html"),
+        "<!doctype html><html><body>painel do processo</body></html>");
     return directory;
   }
 

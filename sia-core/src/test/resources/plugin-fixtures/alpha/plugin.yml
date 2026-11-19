@@ -6,3 +6,7 @@ author: Testes
 kind: java
 main: testplugin.alpha.AlphaPlugin
 permissions: []
+ui:
+  entry: ui/panel.html
+  width: 480
+  height: 360

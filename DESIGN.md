@@ -132,9 +132,10 @@ canto vivo convivendo com arredondado na mesma tela.
 
 ## Painel de plugin
 
-Quando o plugin traz a própria tela, o console é só a moldura: cartão branco de 16px, cabeçalho com
-nome e versão do plugin, `iframe` ocupando o resto. O conteúdo dentro é do plugin — não aplicamos o
-nosso sistema de design ali, e é isso que permite telas ricas (prévia, tabela, etapas).
+Todo plugin traz a própria tela — é obrigatório no manifesto. O console é só a moldura: cartão
+branco de 16px, cabeçalho com nome e versão do plugin, `iframe` ocupando o resto. O conteúdo dentro é
+do plugin; não aplicamos o nosso sistema de design ali, e é isso que permite telas ricas (prévia,
+tabela, etapas).
 
 O painel abre centralizado, com fundo escurecido a 36%, largura e altura vindas do manifesto (padrão
 560×460), no máximo `100vw - 48px`. Fechar é no ✕, no clique fora ou no `Esc` — sempre.

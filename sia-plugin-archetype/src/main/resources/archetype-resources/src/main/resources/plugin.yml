@@ -6,4 +6,8 @@ author: ${groupId}
 description: Descreva aqui o que o plugin faz
 kind: java
 main: ${package}.SamplePlugin
+ui:
+  entry: ui/panel.html
+  width: 560
+  height: 460
 permissions: []

@@ -8,3 +8,7 @@ kind: java
 main: com.accord.integrations.receitanet.ReceitanetPlugin
 permissions: [process]
 requires-os: [windows]
+ui:
+  entry: ui/panel.html
+  width: 620
+  height: 620

@@ -372,7 +372,6 @@
    */
   function automationCard(automation, plugin) {
     const disabled = !plugin || plugin.state !== "ENABLED";
-    const hasPanel = Boolean(plugin && plugin.ui);
     const paramCount = (automation.params || []).length;
     return h(
       "article",
@@ -381,11 +380,9 @@
         h("div", {},
           h("h3", { class: "title" }, automation.name || automation.id),
           h("p", { class: "mono faint", style: "margin-top:2px" }, automation.id)),
-        hasPanel
-          ? h("span", { class: "pill pill-success" }, "interface própria")
-          : paramCount
-              ? h("span", { class: "pill pill-neutral" }, `${paramCount} campo${paramCount > 1 ? "s" : ""}`)
-              : null),
+        paramCount
+          ? h("span", { class: "pill pill-neutral" }, `${paramCount} campo${paramCount > 1 ? "s" : ""}`)
+          : null),
       h("p", { class: "muted", style: "margin-top:10px;min-height:40px" }, automation.description || "Sem descrição."),
       h("div", { class: "row", style: "margin-top:14px;justify-content:space-between" },
         disabled ? h("span", { class: "pill pill-neutral" }, "plugin desabilitado") : h("span"),
@@ -393,30 +390,48 @@
           class: "btn btn-primary btn-sm",
           type: "button",
           disabled,
-          onclick: () => (hasPanel ? openPluginPanel(/** @type {Plugin} */ (plugin), automation) : openRunForm(automation)),
-        }, hasPanel ? "Abrir painel" : "Executar")),
+          onclick: () => openPluginPanel(/** @type {Plugin} */ (plugin), automation),
+        }, "Abrir painel")),
     );
   }
 
   /* ---------------- painel do plugin ---------------- */
 
   /**
+   * Todo plugin tem interface propria: o console so abre a moldura e entrega as automacoes.
+   *
    * @param {Plugin} plugin
    * @param {Automation | null} automation
    */
-  function openPluginPanel(plugin, automation) {
+  async function openPluginPanel(plugin, automation) {
     const frame = $("#panel-frame");
     $("#panel-eyebrow").textContent = `${plugin.name} · v${plugin.version}`;
     $("#panel-title").textContent = automation ? automation.name || automation.id : plugin.name;
-    const ui = plugin.ui || { entry: "", width: 560, height: 460 };
+    const ui = plugin.ui;
     const window_ = $(".panel-window");
     window_.style.setProperty("--panel-w", `${ui.width}px`);
     window_.style.setProperty("--panel-h", `${ui.height}px`);
     $("#panel").hidden = false;
     document.body.style.overflow = "hidden";
     state.panel = { plugin, frame, automation };
-    frame.onload = () => sendToPanel({ type: "sia:init", plugin: { id: plugin.id, name: plugin.name }, automation });
-    frame.src = `/api/plugins/${encodeURIComponent(String(plugin.id))}/ui/${ui.entry}`;
+
+    // o painel recebe todas as automacoes do plugin para montar a propria tela
+    let automations = [];
+    try {
+      const all = /** @type {Automation[]} */ (await api("/api/automations"));
+      automations = (all || []).filter((candidate) => plugin.automations.includes(String(candidate.id)));
+    } catch {
+      automations = automation ? [automation] : [];
+    }
+
+    frame.onload = () =>
+      sendToPanel({
+        type: "sia:init",
+        plugin: { id: plugin.id, name: plugin.name, version: plugin.version },
+        automation,
+        automations,
+      });
+    frame.src = `/api/plugins/${encodeURIComponent(plugin.id)}/ui/${ui.entry}`;
   }
 
   function sendToPanel(message) {
@@ -486,99 +501,7 @@
     }
   });
 
-  function openRunForm(automation) {
-    const fields = automation.params.map((param) => {
-      const id = `param-${param.name}`;
-      let input;
-      if (param.type === "BOOLEAN") {
-        input = h("input", { id, name: param.name, type: "checkbox", style: "width:auto;height:auto" });
-      } else {
-        input = h("input", {
-          id,
-          name: param.name,
-          type: param.sensitive ? "password" : param.type === "INTEGER" ? "number" : "text",
-          placeholder: param.sensitive ? "não é exibido depois" : "",
-          required: param.required,
-          autocomplete: "off",
-        });
-      }
-      const label = param.type === "BOOLEAN"
-        ? h("label", { class: "row", for: id, style: "gap:8px" }, input, h("span", {}, param.name))
-        : h("label", { class: "field", for: id },
-            h("span", { class: "field-label" }, param.name + (param.required ? " *" : "")),
-            input,
-            param.sensitive ? h("span", { class: "field-hint" }, "valor sensível: não aparece no histórico") : null);
-      return { param, label, input };
-    });
 
-    const body = h("div", { class: "stack" },
-      h("p", { class: "muted" }, automation.description || "Preencha os campos e execute."),
-      fields.length
-        ? h("div", { class: "form-grid" }, fields.map((field) => field.label))
-        : h("p", { class: "faint" }, "Esta automação não precisa de nenhum campo."));
-
-    const foot = h("div", { class: "row", style: "justify-content:flex-end;width:100%" },
-      h("button", { class: "btn", type: "button", "data-close": "drawer" }, "Cancelar"),
-      h("button", { class: "btn btn-primary", type: "button", onclick: submit }, "Executar agora"));
-
-    openDrawer({
-      eyebrow: "Executar",
-      title: automation.name || automation.id,
-      body,
-      foot,
-    });
-
-    async function submit() {
-      /** @type {Record<string, unknown>} */
-      const params = {};
-      for (const { param, input } of fields) {
-        if (param.type === "BOOLEAN") {
-          if (input.checked) params[param.name] = true;
-          continue;
-        }
-        const value = input.value.trim();
-        if (!value) {
-          if (param.required) {
-            toast(`Preencha o campo ${param.name}.`, "error");
-            input.focus();
-            return;
-          }
-          continue;
-        }
-        params[param.name] = param.type === "INTEGER" ? Number(value) : value;
-      }
-      foot.querySelectorAll("button").forEach((button) => (button.disabled = true));
-      try {
-        const created = await submitRun({ automation: String(automation.id), params });
-        watchRun(created.runId, automation.name || automation.id);
-      } catch (error) {
-        toast(error.message, "error");
-        foot.querySelectorAll("button").forEach((button) => (button.disabled = false));
-      }
-    }
-  }
-
-  function watchRun(runId, title) {
-    const body = h("div", { class: "stack" },
-      h("p", { class: "mono faint" }, `execução ${runId}`),
-      h("div", { class: "progress" }, h("span")),
-      h("p", { class: "muted" }, "Executando… pode levar alguns minutos."));
-    openDrawer({ eyebrow: "Em execução", title, body, foot: null });
-
-    clearInterval(state.timer);
-    state.timer = setInterval(async () => {
-      try {
-        const run = await api(`/api/runs/${runId}`);
-        if (!TERMINAL.has(run.status)) return;
-        clearInterval(state.timer);
-        openRun(runId);
-        toast(run.status === "SUCCESS" ? "Execução concluída com sucesso." : "A execução terminou com falha.", run.status === "SUCCESS" ? "info" : "error");
-      } catch (error) {
-        clearInterval(state.timer);
-        toast(error.message, "error");
-      }
-    }, 900);
-  }
 
   /* ---------------- histórico ---------------- */
 

@@ -1,8 +1,20 @@
 # ADR-0006 — Interface visual própria do plugin
 
-- **Status:** aceito
+- **Status:** aceito — **revisado em 2026-11-19: `ui` passou a ser obrigatória**
 - **Data:** 2026-11-19
-- **Relacionado:** D2, D8, T15, T17
+- **Relacionado:** D2, D8, T15, T17, T18
+
+## Revisão (2026-11-19)
+
+A primeira versão deixava `ui` opcional e mantinha o formulário gerado como padrão. Na prática, a
+tela gerada não dava conta do uso real: o usuário precisa escolher operação, ver o que vai acontecer
+e acompanhar o resultado. A decisão foi tornar a interface **obrigatória**:
+
+- o validador recusa manifesto sem `ui.entry`;
+- o console removeu o formulário gerado (`openRunForm`) e sempre abre o painel do plugin;
+- o `sia:init` passou a entregar **todas as automações do plugin**, para o painel montar a própria
+  navegação (o `receitanet-bx` usa isso para o seletor de operação);
+- o archetype e os plugins do repositório (`receitanet-bx`, `hello-plugin`) ganharam painel.
 
 ## Contexto
 

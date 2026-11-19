@@ -1,6 +1,6 @@
 // E2E mínimo sem dependências: dirige o Edge por CDP e tira print do painel do plugin.
 // Uso: node e2e-panel.mjs <url> <caminho-do-png>
-const [, , url, outfile] = process.argv;
+const [, , url, outfile, cardText = ""] = process.argv;
 const CDP = process.env.CDP_URL || "http://127.0.0.1:9333";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -61,7 +61,11 @@ await sleep(3500);
 
 const clicked = await cdp.send("Runtime.evaluate", {
   expression: `(() => {
-    const button = [...document.querySelectorAll("button")].find((b) => b.textContent.includes("Abrir painel"));
+    const filter = ${JSON.stringify(cardText)};
+    const buttons = [...document.querySelectorAll("button")].filter((b) => b.textContent.includes("Abrir painel"));
+    const button = filter
+      ? buttons.find((b) => (b.closest("article") || b).innerText.includes(filter))
+      : buttons[0];
     if (!button) return "botao-nao-encontrado";
     button.click();
     return "clicado";
@@ -103,11 +107,14 @@ if (iframeTarget) {
     { expression: `document.getElementById("go").click()` },
     sessionId,
   );
-  await sleep(4000);
+  await sleep(12000);
   const result = await cdp.send(
     "Runtime.evaluate",
     {
-      expression: `document.getElementById("out").innerText.replace(/\\s+/g, " ").trim()`,
+      expression: `(() => {
+        const node = document.getElementById("out") || document.getElementById("resultado");
+        return node ? node.innerText.replace(/\\s+/g, " ").trim() : "(sem area de resultado)";
+      })()`,
       returnByValue: true,
     },
     sessionId,

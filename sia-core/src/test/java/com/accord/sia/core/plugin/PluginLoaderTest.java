@@ -106,6 +106,8 @@ class PluginLoaderTest {
         api-version: "1.0"
         kind: process
         command: ["java", "-version"]
+        ui:
+          entry: ui/panel.html
         """);
     Files.write(directory.resolve("plugin.jar"), new byte[] {0});
 

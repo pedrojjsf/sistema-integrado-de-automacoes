@@ -35,12 +35,14 @@ public final class ManifestValidator {
   }
 
   /**
-   * Interface propria do plugin: HTML dentro do pacote, caminho relativo e sem saida de diretorio.
-   * Sem essa secao o console gera o formulario a partir dos parametros.
+   * Interface propria do plugin: obrigatoria. Todo plugin entrega a propria tela; o Core so abre a
+   * moldura. O caminho e relativo ao pacote e nao pode sair da pasta declarada.
    */
   private void validateUi(PluginManifest manifest) throws InvalidPluginException {
     if (manifest.ui() == null) {
-      return;
+      throw new InvalidPluginException(
+          "ui",
+          "obrigatorio: declare ui.entry com a pagina do plugin (ex.: ui/panel.html)");
     }
     String entry = manifest.ui().entry();
     if (isBlank(entry)) {

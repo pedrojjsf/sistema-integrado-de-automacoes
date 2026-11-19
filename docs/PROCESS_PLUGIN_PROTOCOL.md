@@ -131,6 +131,8 @@ version: 1.0.0
 api-version: "1.0"
 kind: process
 command: ["python", "main.py"]   # caminho relativo ao pacote, ou nome no PATH
+ui:
+  entry: ui/panel.html           # OBRIGATÓRIO: a tela do plugin
 ```
 
 ## Exemplo em Python

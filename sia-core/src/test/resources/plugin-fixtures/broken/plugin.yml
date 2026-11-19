@@ -4,3 +4,7 @@ version: 1.0.0
 api-version: "1.0"
 kind: java
 main: testplugin.broken.BrokenPlugin
+ui:
+  entry: ui/panel.html
+  width: 480
+  height: 360

@@ -5,3 +5,7 @@ api-version: "1.0"
 kind: java
 main: testplugin.beta.BetaPlugin
 permissions: []
+ui:
+  entry: ui/panel.html
+  width: 480
+  height: 360

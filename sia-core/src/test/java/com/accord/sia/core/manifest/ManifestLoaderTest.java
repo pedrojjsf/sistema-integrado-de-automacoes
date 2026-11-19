@@ -25,6 +25,8 @@ class ManifestLoaderTest {
       kind: java
       main: com.accord.plugins.demo.DemoPlugin
       permissions: [storage]
+      ui:
+        entry: ui/panel.html
       """;
 
   private static final String PROCESS_MANIFEST =
@@ -39,6 +41,8 @@ class ManifestLoaderTest {
       command: ["java", "-Djava.awt.headless=true", "-cp", "app/receitanetbx-bot.jar", "numberia.bot.Inicio"]
       permissions: [process]
       requires-os: [windows]
+      ui:
+        entry: ui/panel.html
       """;
 
   @Test

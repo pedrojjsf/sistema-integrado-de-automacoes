@@ -64,6 +64,10 @@ author: Time de Automação
 description: Uma frase sobre o que o plugin faz
 kind: java                    # java | process
 main: com.accord.plugins.meu.SamplePlugin   # só no kind=java
+ui:                           # OBRIGATÓRIO: a tela do plugin
+  entry: ui/panel.html
+  width: 560
+  height: 460
 permissions: [storage]        # mínimo necessário — deny-by-default
 ```
 
@@ -72,12 +76,14 @@ No modo `process` troque `main` por:
 ```yaml
 kind: process
 command: ["python", "main.py"]   # caminho relativo ao pacote, ou nome no PATH
+ui:
+  entry: ui/panel.html
 ```
 
 O validador recusa: campo desconhecido, id fora do formato, versão fora de SemVer, `api-version`
 incompatível, `kind` ausente, `main` faltando (java) ou `command` faltando (process), caminho
 absoluto, `..`, protocolo diferente de `stdio-jsonl-v1`, permissão desconhecida, dependência
-inexistente e `requires-os` inválido.
+inexistente, `requires-os` inválido e **`ui` ausente**.
 
 ---
 
@@ -243,10 +249,10 @@ steps:
 
 ---
 
-## 10. Interface própria do plugin
+## 10. Interface própria do plugin (obrigatória)
 
-Além do formulário gerado, o plugin pode trazer a **própria tela** — escolher arquivo, mostrar prévia,
-acompanhar etapas. É só declarar no manifesto:
+Todo plugin entrega a **própria tela** — escolher arquivo, mostrar prévia, acompanhar etapas. É
+obrigatório declarar no manifesto:
 
 ```yaml
 ui:

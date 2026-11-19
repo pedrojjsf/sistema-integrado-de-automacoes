@@ -56,9 +56,10 @@ class PluginUiTest {
                 new PluginCandidate(
                     alpha, alpha.resolve("plugin.yml"), alpha.resolve("plugin.jar")));
 
-    assertThatThrownBy(() -> PluginUi.read(plugin, "ui/panel.html"))
+    // a interface agora e obrigatoria; o que resta proibido e sair da pasta ui/
+    assertThatThrownBy(() -> PluginUi.read(plugin, "outra/pagina.html"))
         .isInstanceOf(IOException.class)
-        .hasMessageContaining("nao declara interface propria");
+        .hasMessageContaining("so pode servir arquivos de ui/");
     plugin.unload();
   }
 

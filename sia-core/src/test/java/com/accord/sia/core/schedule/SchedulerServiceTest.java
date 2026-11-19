@@ -53,7 +53,11 @@ class SchedulerServiceTest {
     scheduler.create("alpha.run", new Trigger.Interval(Duration.ofSeconds(1)), Map.of(), "sub-1");
     scheduler.start();
 
-    Thread.sleep(2_600);
+    // espera de verdade (com limite) em vez de sleep fixo: sob carga o disparo atrasa
+    long deadline = System.currentTimeMillis() + 10_000;
+    while (launches.size() < 2 && System.currentTimeMillis() < deadline) {
+      Thread.sleep(100);
+    }
 
     assertThat(launches).hasSizeGreaterThanOrEqualTo(2);
     assertThat(scheduler.firedCount()).isGreaterThanOrEqualTo(2);
