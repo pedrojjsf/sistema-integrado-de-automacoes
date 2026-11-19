@@ -285,7 +285,12 @@
     content.replaceChildren(h("div", { class: "empty" }, "Carregando catálogo…"));
     try {
       const [automations, plugins] = await Promise.all([api("/api/automations"), api("/api/plugins")]);
-      const byId = new Map(plugins.map((plugin) => [plugin.id, plugin]));
+      // a automacao pode nao ter o prefixo do id do plugin (hello.say -> hello-plugin):
+      // o vinculo correto vem da lista de automacoes publicada por cada plugin
+      const byAutomation = new Map();
+      for (const plugin of plugins) {
+        for (const automationId of plugin.automations) byAutomation.set(automationId, plugin);
+      }
       if (automations.length === 0) {
         content.replaceChildren(h("div", { class: "empty" }, "Nenhuma automação instalada ainda."));
         return;
@@ -293,7 +298,7 @@
       content.replaceChildren(
         h("p", { class: "muted" }, "Escolha o que executar. Automações com interface própria abrem o painel do plugin."),
         h("div", { class: "card-grid" }, automations.map((automation) =>
-          automationCard(automation, byId.get(automation.id.split(".")[0])))),
+          automationCard(automation, byAutomation.get(automation.id)))),
       );
     } catch (error) {
       content.replaceChildren(h("div", { class: "empty" }, "Falha ao carregar: " + error.message));
