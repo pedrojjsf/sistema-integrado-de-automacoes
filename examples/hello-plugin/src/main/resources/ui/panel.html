@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hello Plugin — painel</title>
+    <style>
+      :root {
+        --ink: #171a1f;
+        --ink-soft: #4c525c;
+        --line: #e2ded6;
+        --primary: #0e5a5e;
+        --primary-soft: #e1edec;
+        --ok: #1f6f43;
+        --err: #9e2b2b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink);
+        background: #fff; font-size: 14px; padding: 18px;
+      }
+      h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: 0.01em; }
+      p.sub { margin: 0 0 16px; color: var(--ink-soft); font-size: 12.5px; }
+      .field { display: grid; gap: 5px; margin-bottom: 12px; }
+      .field span { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
+      input, select {
+        height: 34px; border: 1px solid var(--line); border-radius: 6px;
+        padding: 0 9px; font: inherit; background: #fff; color: var(--ink); width: 100%;
+      }
+      input:focus-visible, select:focus-visible, button:focus-visible {
+        outline: 2px solid var(--primary-soft); border-color: var(--primary);
+      }
+      .actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+      button {
+        height: 34px; padding: 0 14px; border-radius: 6px; border: 1px solid var(--primary);
+        background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+      }
+      button:disabled { opacity: 0.55; cursor: progress; }
+      .out {
+        margin-top: 16px; border: 1px solid var(--line); border-radius: 8px;
+        padding: 12px; min-height: 64px; background: #faf9f6;
+      }
+      .out strong { display: block; font-size: 20px; margin-bottom: 4px; }
+      .out .meta { color: var(--ink-soft); font-size: 12px; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+        font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+      .pill.ok { background: #e2efe6; color: var(--ok); }
+      .pill.err { background: #f6e1e0; color: var(--err); }
+      .foot { margin-top: 14px; color: var(--ink-soft); font-size: 11.5px; }
+    </style>
+  </head>
+  <body>
+    <h1>Saudação</h1>
+    <p class="sub">Esta tela é do plugin: o SIA só abre a moldura e entrega o resultado.</p>
+
+    <label class="field">
+      <span>Nome</span>
+      <input id="nome" value="Camila" autocomplete="off" />
+    </label>
+
+    <label class="field">
+      <span>Idioma</span>
+      <select id="idioma">
+        <option value="pt">Português</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+
+    <div class="actions">
+      <button id="go" type="button">Saudar</button>
+      <span id="state" class="meta"></span>
+    </div>
+
+    <div class="out" id="out">
+      <span class="meta">O resultado aparece aqui.</span>
+    </div>
+
+    <p class="foot">A execução fica registrada no histórico do SIA como qualquer outra.</p>
+
+    <script>
+      (function () {
+        var go = document.getElementById("go");
+        var out = document.getElementById("out");
+        var state = document.getElementById("state");
+
+        go.addEventListener("click", function () {
+          go.disabled = true;
+          state.textContent = "executando…";
+          window.parent.postMessage(
+            {
+              type: "sia:execute",
+              automation: "hello.say",
+              params: {
+                nome: document.getElementById("nome").value.trim(),
+                idioma: document.getElementById("idioma").value,
+              },
+            },
+            "*"
+          );
+        });
+
+        window.addEventListener("message", function (event) {
+          var message = event.data || {};
+          if (message.type === "sia:init") {
+            state.textContent = "";
+          }
+          if (message.type === "sia:started") {
+            state.textContent = "executando…";
+          }
+          if (message.type !== "sia:result") {
+            return;
+          }
+          go.disabled = false;
+          state.textContent = "";
+          var ok = message.status === "SUCCESS";
+          out.innerHTML = "";
+          var pill = document.createElement("span");
+          pill.className = "pill " + (ok ? "ok" : "err");
+          pill.textContent = message.status;
+          var texto = document.createElement("strong");
+          texto.textContent = ok
+            ? (message.outputs && message.outputs.saudacao) || "(sem saída)"
+            : message.message || "falhou";
+          var meta = document.createElement("span");
+          meta.className = "meta";
+          meta.textContent = ok
+            ? "duração " + (message.durationMillis || 0) + " ms"
+            : "código " + (message.errorCode || "—");
+          out.appendChild(pill);
+          out.appendChild(texto);
+          out.appendChild(meta);
+        });
+
+        window.parent.postMessage({ type: "sia:ready" }, "*");
+      })();
+    </script>
+  </body>
+</html>

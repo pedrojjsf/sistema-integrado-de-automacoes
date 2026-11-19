@@ -6,4 +6,8 @@ author: Accord
 description: Exemplo minimo de plugin do SIA
 kind: java
 main: com.accord.examples.hello.HelloPlugin
+ui:
+  entry: ui/panel.html
+  width: 520
+  height: 520
 permissions: []

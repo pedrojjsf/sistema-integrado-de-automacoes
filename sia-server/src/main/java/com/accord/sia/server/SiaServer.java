@@ -15,6 +15,7 @@ import com.accord.sia.auth.SiaRole;
 import com.accord.sia.core.SiaCore;
 import com.accord.sia.core.config.SiaConfig;
 import com.accord.sia.core.plugin.LoadedPlugin;
+import com.accord.sia.core.plugin.PluginUi;
 import com.accord.sia.core.run.RunRecord;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -148,6 +149,7 @@ public final class SiaServer implements AutoCloseable {
     app.get("/api/health", this::health);
     app.get("/api/plugins", this::plugins);
     app.get("/api/plugins/{id}", this::plugin);
+    app.get("/api/plugins/{id}/ui/*", this::pluginUi);
     app.get("/api/automations", this::automations);
     app.post("/api/runs", this::createRun);
     app.get("/api/runs/{id}/events", this::events);
@@ -271,12 +273,38 @@ public final class SiaServer implements AutoCloseable {
   }
 
   private Map<String, Object> pluginView(LoadedPlugin plugin) {
-    return Map.of(
-        "id", plugin.id(),
-        "name", plugin.manifest().name(),
-        "version", plugin.manifest().version(),
-        "state", plugin.state().name(),
-        "automations", plugin.instance().automations().stream().map(a -> a.id()).toList());
+    Map<String, Object> view = new LinkedHashMap<>();
+    view.put("id", plugin.id());
+    view.put("name", plugin.manifest().name());
+    view.put("version", plugin.manifest().version());
+    view.put("state", plugin.state().name());
+    view.put("automations", plugin.instance().automations().stream().map(a -> a.id()).toList());
+    var ui = plugin.manifest().ui();
+    view.put(
+        "ui",
+        ui == null
+            ? null
+            : Map.of("entry", ui.entry(), "width", ui.width(), "height", ui.height()));
+    return view;
+  }
+
+  /** Serve a interface propria do plugin, restrita aos arquivos dentro da pasta declarada. */
+  private void pluginUi(Context ctx) {
+    String id = ctx.pathParam("id");
+    LoadedPlugin plugin =
+        core.plugin(id)
+            .orElseThrow(() -> new IllegalArgumentException("plugin desconhecido: " + id));
+    String marker = "/ui/";
+    int index = ctx.path().indexOf(marker);
+    String path = index < 0 ? "" : ctx.path().substring(index + marker.length());
+    try {
+      PluginUi.Resource resource = PluginUi.read(plugin, path);
+      ctx.contentType(resource.contentType());
+      ctx.header("Cache-Control", "no-cache");
+      ctx.result(new java.io.ByteArrayInputStream(resource.content()));
+    } catch (java.io.IOException error) {
+      throw new IllegalArgumentException(error.getMessage());
+    }
   }
 
   private void automations(Context ctx) {
@@ -308,6 +336,22 @@ public final class SiaServer implements AutoCloseable {
     Principal principal = ctx.attribute("principal");
     Actor actor = Actor.user(principal.subject(), principal.displayName());
     Parameters params = Parameters.of(payload.params() == null ? Map.of() : payload.params());
+
+    // wait=true: executa e devolve o resultado com os valores de saida em memoria.
+    // Usado pelo painel do plugin; o historico continua guardando apenas as chaves.
+    if ("true".equalsIgnoreCase(ctx.queryParam("wait"))) {
+      var outcome = core.execute(payload.automation(), params, actor);
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("runId", outcome.runId().value());
+      body.put("automation", payload.automation());
+      body.put("status", outcome.status().name());
+      body.put("errorCode", outcome.errorCode());
+      body.put("message", outcome.message());
+      body.put("outputs", outcome.outputs());
+      body.put("durationMillis", outcome.duration() == null ? null : outcome.duration().toMillis());
+      ctx.json(body);
+      return;
+    }
 
     String idempotencyKey = ctx.header("Idempotency-Key");
     RunId runId =

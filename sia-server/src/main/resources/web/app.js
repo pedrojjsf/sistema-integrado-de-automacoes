@@ -285,22 +285,24 @@
     content.replaceChildren(h("div", { class: "empty" }, "Carregando catálogo…"));
     try {
       const [automations, plugins] = await Promise.all([api("/api/automations"), api("/api/plugins")]);
-      const disabled = new Set(plugins.filter((p) => p.state !== "ENABLED").map((p) => p.id));
+      const byId = new Map(plugins.map((plugin) => [plugin.id, plugin]));
       if (automations.length === 0) {
         content.replaceChildren(h("div", { class: "empty" }, "Nenhuma automação instalada ainda."));
         return;
       }
       content.replaceChildren(
-        h("p", { class: "muted" }, "Escolha o que executar. Campos marcados como obrigatórios precisam ser preenchidos."),
-        h("div", { class: "card-grid" }, automations.map((automation) => automationCard(automation, disabled))),
+        h("p", { class: "muted" }, "Escolha o que executar. Automações com interface própria abrem o painel do plugin."),
+        h("div", { class: "card-grid" }, automations.map((automation) =>
+          automationCard(automation, byId.get(automation.id.split(".")[0])))),
       );
     } catch (error) {
       content.replaceChildren(h("div", { class: "empty" }, "Falha ao carregar: " + error.message));
     }
   }
 
-  function automationCard(automation, disabledPlugins) {
-    const pluginId = automation.id.split(".")[0];
+  function automationCard(automation, plugin) {
+    const disabled = !plugin || plugin.state !== "ENABLED";
+    const hasPanel = Boolean(plugin && plugin.ui);
     const paramCount = automation.params.length;
     return h(
       "article",
@@ -309,18 +311,108 @@
         h("div", {},
           h("h3", { class: "title" }, automation.name || automation.id),
           h("p", { class: "mono faint", style: "margin-top:2px" }, automation.id)),
-        paramCount ? h("span", { class: "pill pill-neutral" }, `${paramCount} campo${paramCount > 1 ? "s" : ""}`) : null),
+        hasPanel
+          ? h("span", { class: "pill pill-success" }, "interface própria")
+          : paramCount
+              ? h("span", { class: "pill pill-neutral" }, `${paramCount} campo${paramCount > 1 ? "s" : ""}`)
+              : null),
       h("p", { class: "muted", style: "margin-top:10px;min-height:40px" }, automation.description || "Sem descrição."),
       h("div", { class: "row", style: "margin-top:14px;justify-content:space-between" },
-        disabledPlugins.has(pluginId) ? h("span", { class: "pill pill-neutral" }, "plugin desabilitado") : h("span"),
+        disabled ? h("span", { class: "pill pill-neutral" }, "plugin desabilitado") : h("span"),
         h("button", {
           class: "btn btn-primary btn-sm",
           type: "button",
-          disabled: disabledPlugins.has(pluginId),
-          onclick: () => openRunForm(automation),
-        }, "Executar")),
+          disabled,
+          onclick: () => (hasPanel ? openPluginPanel(plugin, automation) : openRunForm(automation)),
+        }, hasPanel ? "Abrir painel" : "Executar")),
     );
   }
+
+  /* ---------------- painel do plugin ---------------- */
+
+  function openPluginPanel(plugin, automation) {
+    const frame = $("#panel-frame");
+    $("#panel-eyebrow").textContent = `${plugin.name} · v${plugin.version}`;
+    $("#panel-title").textContent = automation ? automation.name || automation.id : plugin.name;
+    const window_ = $(".panel-window");
+    window_.style.setProperty("--panel-w", `${plugin.ui.width}px`);
+    window_.style.setProperty("--panel-h", `${plugin.ui.height}px`);
+    $("#panel").hidden = false;
+    document.body.style.overflow = "hidden";
+    state.panel = { plugin, frame, automation };
+    frame.onload = () => sendToPanel({ type: "sia:init", plugin: { id: plugin.id, name: plugin.name }, automation });
+    frame.src = `/api/plugins/${encodeURIComponent(plugin.id)}/ui/${plugin.ui.entry}`;
+  }
+
+  function sendToPanel(message) {
+    const frame = state.panel && state.panel.frame;
+    if (frame && frame.contentWindow) frame.contentWindow.postMessage(message, "*");
+  }
+
+  function closePanel() {
+    const frame = $("#panel-frame");
+    $("#panel").hidden = true;
+    document.body.style.overflow = "";
+    state.panel = null;
+    frame.onload = null;
+    frame.src = "about:blank";
+  }
+
+  async function runFromPanel(automationId, params) {
+    const automation = automationId || (state.panel && state.panel.automation && state.panel.automation.id);
+    if (!automation) {
+      sendToPanel({ type: "sia:result", status: "FAILURE", errorCode: "AUTOMATION_UNDEFINED", message: "automação não informada" });
+      return;
+    }
+    try {
+      sendToPanel({ type: "sia:started", automation });
+      // wait=true devolve as saídas em memória para o painel exibir (o histórico guarda só chaves)
+      const result = await api("/api/runs?wait=true", {
+        method: "POST",
+        body: { automation, params: params || {} },
+      });
+      sendToPanel({
+        type: "sia:result",
+        automation,
+        runId: result.runId,
+        status: result.status,
+        errorCode: result.errorCode,
+        message: result.message || EXPLAIN[result.errorCode] || "",
+        outputs: result.outputs || {},
+        durationMillis: result.durationMillis,
+      });
+      loadConnection();
+    } catch (error) {
+      sendToPanel({ type: "sia:result", automation, status: "FAILURE", message: error.message });
+    }
+  }
+
+  async function waitRun(runId) {
+    for (let attempt = 0; attempt < 600; attempt++) {
+      const run = await api(`/api/runs/${runId}`);
+      if (TERMINAL.has(run.status)) return run;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+    throw new Error("a execução não terminou no tempo esperado");
+  }
+
+  window.addEventListener("message", (event) => {
+    const panel = state.panel;
+    if (!panel || !panel.frame || event.source !== panel.frame.contentWindow) return;
+    const message = event.data || {};
+    switch (message.type) {
+      case "sia:execute":
+        runFromPanel(message.automation, message.params);
+        break;
+      case "sia:log":
+        break; // o log oficial é o do Core
+      case "sia:close":
+        closePanel();
+        break;
+      default:
+        break;
+    }
+  });
 
   function openRunForm(automation) {
     const fields = automation.params.map((param) => {
@@ -734,10 +826,13 @@
 
   document.addEventListener("click", (event) => {
     if (event.target.closest("[data-close='drawer']")) closeDrawer();
+    if (event.target.closest("[data-close='panel']")) closePanel();
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !$("#drawer").hidden) closeDrawer();
+    if (event.key !== "Escape") return;
+    if (!$("#panel").hidden) closePanel();
+    else if (!$("#drawer").hidden) closeDrawer();
   });
 
   /* ---------------- boot ---------------- */

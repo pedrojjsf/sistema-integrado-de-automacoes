@@ -1,0 +1,12 @@
+id: panel-plugin
+name: Panel
+version: 1.0.0
+api-version: "1.0"
+author: Testes
+kind: java
+main: testplugin.panel.PanelPlugin
+ui:
+  entry: ui/panel.html
+  width: 480
+  height: 360
+permissions: []

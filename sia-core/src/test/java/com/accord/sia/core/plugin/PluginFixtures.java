@@ -37,7 +37,7 @@ public final class PluginFixtures {
 
     compile(fixtureRoot, classes);
     Path manifest = fixtureRoot.resolve("plugin.yml");
-    jar(classes, target.resolve("plugin.jar"), manifest);
+    jar(classes, target.resolve("plugin.jar"), manifest, fixtureRoot);
     Files.copy(manifest, target.resolve("plugin.yml"));
     return target;
   }
@@ -77,7 +77,8 @@ public final class PluginFixtures {
     }
   }
 
-  private static void jar(Path classes, Path jarFile, Path manifest) throws IOException {
+  private static void jar(Path classes, Path jarFile, Path manifest, Path fixtureRoot)
+      throws IOException {
     try (OutputStream out = Files.newOutputStream(jarFile);
         JarOutputStream jar = new JarOutputStream(out);
         Stream<Path> files = Files.walk(classes)) {
@@ -89,6 +90,20 @@ public final class PluginFixtures {
         jar.putNextEntry(new JarEntry(entry));
         jar.write(Files.readAllBytes(file));
         jar.closeEntry();
+      }
+      // recursos da fixture (ex.: ui/panel.html) entram no jar como o plugin real embarca
+      try (Stream<Path> resources = Files.walk(fixtureRoot)) {
+        for (Path file :
+            resources
+                .filter(Files::isRegularFile)
+                .filter(path -> !path.toString().endsWith(".java"))
+                .filter(path -> !path.getFileName().toString().equals("plugin.yml"))
+                .toList()) {
+          String entry = fixtureRoot.relativize(file).toString().replace('\\', '/');
+          jar.putNextEntry(new JarEntry(entry));
+          jar.write(Files.readAllBytes(file));
+          jar.closeEntry();
+        }
       }
     } catch (UncheckedIOException error) {
       throw error.getCause();

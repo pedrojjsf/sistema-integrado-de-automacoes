@@ -239,10 +239,33 @@ steps:
 - [ ] `assertNoSensitiveData` no teste com dado sensível
 - [ ] `shutdown()` idempotente, sem thread ou conexão vazando
 - [ ] `mvn verify` do plugin verde
+- [ ] se tiver painel: `ui.entry` no manifesto e página testada em 520×460
 
 ---
 
-## 10. Versionamento
+## 10. Interface própria do plugin
+
+Além do formulário gerado, o plugin pode trazer a **própria tela** — escolher arquivo, mostrar prévia,
+acompanhar etapas. É só declarar no manifesto:
+
+```yaml
+ui:
+  entry: ui/panel.html   # dentro do pacote
+  width: 520
+  height: 460
+```
+
+O console abre essa página num painel isolado e conversa por mensagens:
+
+```js
+parent.postMessage({ type: "sia:execute", automation: "meu-plugin.rodar", params: { x: 1 } }, "*");
+addEventListener("message", (e) => { if (e.data.type === "sia:result") mostrar(e.data.outputs); });
+```
+
+O resultado chega **com valores** (execução `wait=true`), mas o histórico continua guardando apenas as
+chaves. Guia completo do painel e do protocolo: [PLUGIN_UI.md](PLUGIN_UI.md).
+
+## 11. Versionamento
 
 - **Versão do plugin** (`version`): SemVer. `fix` → patch, automação nova → minor, mudança
   incompatível em parâmetro ou saída → major.

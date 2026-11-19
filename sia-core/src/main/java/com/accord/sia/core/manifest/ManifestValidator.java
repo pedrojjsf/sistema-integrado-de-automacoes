@@ -31,6 +31,33 @@ public final class ManifestValidator {
     validatePermissions(manifest);
     validateDependencies(manifest);
     validateOs(manifest);
+    validateUi(manifest);
+  }
+
+  /**
+   * Interface propria do plugin: HTML dentro do pacote, caminho relativo e sem saida de diretorio.
+   * Sem essa secao o console gera o formulario a partir dos parametros.
+   */
+  private void validateUi(PluginManifest manifest) throws InvalidPluginException {
+    if (manifest.ui() == null) {
+      return;
+    }
+    String entry = manifest.ui().entry();
+    if (isBlank(entry)) {
+      throw new InvalidPluginException("ui.entry", "obrigatorio quando ui e declarado");
+    }
+    rejectPackageEscape("ui.entry", entry);
+    if (entry.startsWith("/") || entry.contains("\\") || entry.contains(":")) {
+      throw new InvalidPluginException(
+          "ui.entry", "'" + entry + "' precisa ser caminho relativo com /");
+    }
+    if (!entry.toLowerCase(Locale.ROOT).endsWith(".html")) {
+      throw new InvalidPluginException("ui.entry", "'" + entry + "' precisa apontar para .html");
+    }
+    if (entry.contains("?") || entry.contains("#")) {
+      throw new InvalidPluginException(
+          "ui.entry", "'" + entry + "' nao aceita query nem fragmento");
+    }
   }
 
   private void validateIdentity(PluginManifest manifest) throws InvalidPluginException {

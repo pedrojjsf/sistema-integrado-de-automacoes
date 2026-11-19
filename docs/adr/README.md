@@ -18,6 +18,7 @@
 | D14 | Primeiro plugin | `receitanet-bx` como adaptador de processo | [ADR-0001](0001-receitanet-como-plugin-java.md) |
 | D15 | Execução de processo | `ProcessRunner` no Core com allowlist; plugin nunca recebe `ProcessBuilder` | [ADR-0005](0005-processo-controlado-pelo-core.md) |
 | D16 | Protocolo externo | `stdio-jsonl-v1` | [ADR-0002](0002-dois-modos-de-plugin.md) |
+| D17 | Interface do plugin | cada plugin pode trazer a própria tela (HTML no pacote, iframe + postMessage) | [ADR-0006](0006-interface-propria-do-plugin.md) |
 
 ## Decisões registradas só aqui
 

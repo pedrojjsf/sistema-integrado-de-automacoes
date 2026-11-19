@@ -39,7 +39,8 @@ public record PluginManifest(
     String protocol,
     List<String> permissions,
     List<String> dependencies,
-    @JsonProperty("requires-os") List<String> requiresOs) {
+    @JsonProperty("requires-os") List<String> requiresOs,
+    Ui ui) {
 
   public static final String DEFAULT_PROCESS_PROTOCOL = "stdio-jsonl-v1";
 
@@ -59,5 +60,23 @@ public record PluginManifest(
       granted.add(PluginPermission.fromWireName(permission));
     }
     return granted;
+  }
+
+  /**
+   * Interface do plugin: uma pagina propria, como a janela de um plugin de audio.
+   *
+   * <p>Sem {@code ui}, o console gera o formulario a partir dos parametros da automação. Com {@code
+   * ui}, o console abre a pagina do plugin em um painel isolado e fala com ela por mensagens.
+   *
+   * @param entry caminho do HTML dentro do pacote (ex.: {@code ui/panel.html})
+   * @param width largura inicial do painel
+   * @param height altura inicial do painel
+   */
+  public record Ui(String entry, Integer width, Integer height) {
+
+    public Ui {
+      width = width == null || width < 320 || width > 2000 ? 560 : width;
+      height = height == null || height < 240 || height > 2000 ? 460 : height;
+    }
   }
 }
