@@ -195,6 +195,88 @@ components:
           example: '2026-11-19T03:00:00-03:00'
         owner:
           type: string
+    RunRequest:
+      type: object
+      description: corpo do POST /api/runs
+      required: [automation]
+      properties:
+        automation:
+          type: string
+          example: receitanet.diag
+        params:
+          type: object
+          additionalProperties: true
+    RunAccepted:
+      type: object
+      description: resposta 202 do POST /api/runs (assíncrono)
+      properties:
+        runId:
+          type: string
+          format: uuid
+    RunWaited:
+      type: object
+      description: resposta do POST /api/runs?wait=true (saídas com valores, sem persistir)
+      properties:
+        runId:
+          type: string
+          format: uuid
+        automation:
+          type: string
+        status:
+          type: string
+          enum: [SUCCESS, FAILURE, SKIPPED, CANCELLED]
+        errorCode:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+        outputs:
+          type: object
+          additionalProperties: true
+        durationMillis:
+          type: integer
+          nullable: true
+    ScheduleRequest:
+      type: object
+      description: corpo do POST /api/schedules
+      required: [automation, trigger]
+      properties:
+        automation:
+          type: string
+        trigger:
+          $ref: '#/components/schemas/Trigger'
+        params:
+          type: object
+          additionalProperties:
+            type: string
+    WorkflowRunRequest:
+      type: object
+      description: corpo do POST /api/workflows/{name}/runs
+      properties:
+        inputs:
+          type: object
+          additionalProperties: true
+    PluginPathRequest:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          example: C:/build/meu-plugin-1.0.0.jar
+    PluginValidation:
+      type: object
+      description: resposta do POST /api/plugins/validate
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        kind:
+          type: string
+          enum: [java, process]
+        mainClassPresent:
+          type: boolean
     WorkflowRun:
       type: object
       properties:
@@ -240,12 +322,7 @@ components:
       content:
         application/json:
           schema:
-            type: object
-            required: [path]
-            properties:
-              path:
-                type: string
-                example: C:/build/meu-plugin-1.0.0.jar
+            $ref: '#/components/schemas/PluginPathRequest'
 paths:
   /:
     get:
@@ -305,12 +382,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id: {type: string}
-                  version: {type: string}
-                  kind: {type: string, enum: [java, process]}
-                  mainClassPresent: {type: boolean}
+                $ref: '#/components/schemas/PluginValidation'
         '400':
           $ref: '#/components/responses/BadRequest'
   /api/plugins/install:
@@ -424,32 +496,36 @@ paths:
     post:
       tags: [execucoes]
       summary: Executa uma automação
-      parameters:
-        - name: Idempotency-Key
-          in: header
-          schema: {type: string}
-          description: repetir a mesma chave devolve a execução original
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [automation]
-              properties:
-                automation: {type: string, example: receitanet.diag}
-                params:
-                  type: object
-                  additionalProperties: true
+              $ref: '#/components/schemas/RunRequest'
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema: {type: string}
+          description: repetir a mesma chave devolve a execução original
+        - name: wait
+          in: query
+          schema: {type: boolean, default: false}
+          description: |
+            `true` executa e espera terminar, devolvendo as saídas **com valores**
+            (usado pelo painel do plugin). O histórico continua guardando apenas as chaves.
       responses:
+        '200':
+          description: resultado (quando wait=true)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunWaited'
         '202':
           description: aceito
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  runId: {type: string, format: uuid}
+                $ref: '#/components/schemas/RunAccepted'
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
@@ -543,15 +619,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [automation, trigger]
-              properties:
-                automation: {type: string}
-                trigger:
-                  $ref: '#/components/schemas/Trigger'
-                params:
-                  type: object
-                  additionalProperties: {type: string}
+              $ref: '#/components/schemas/ScheduleRequest'
       responses:
         '201':
           description: criado
@@ -620,11 +688,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                inputs:
-                  type: object
-                  additionalProperties: true
+              $ref: '#/components/schemas/WorkflowRunRequest'
       responses:
         '202':
           description: aceito

@@ -74,6 +74,46 @@ export interface Schedule {
   owner?: string;
 }
 
+export interface RunRequest {
+  automation: string;
+  params?: Record<string, unknown>;
+}
+
+export interface RunAccepted {
+  runId?: string;
+}
+
+export interface RunWaited {
+  runId?: string;
+  automation?: string;
+  status?: "SUCCESS" | "FAILURE" | "SKIPPED" | "CANCELLED";
+  errorCode?: string | null;
+  message?: string | null;
+  outputs?: Record<string, unknown>;
+  durationMillis?: number | null;
+}
+
+export interface ScheduleRequest {
+  automation: string;
+  trigger: Trigger;
+  params?: Record<string, string>;
+}
+
+export interface WorkflowRunRequest {
+  inputs?: Record<string, unknown>;
+}
+
+export interface PluginPathRequest {
+  path: string;
+}
+
+export interface PluginValidation {
+  id?: string;
+  version?: string;
+  kind?: "java" | "process";
+  mainClassPresent?: boolean;
+}
+
 export interface WorkflowRun {
   id?: string;
   name?: string;

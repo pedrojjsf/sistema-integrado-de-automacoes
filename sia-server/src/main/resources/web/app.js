@@ -12,6 +12,12 @@
    * @typedef {import("@tipos/api").Automation} Automation
    * @typedef {import("@tipos/api").Run} Run
    * @typedef {import("@tipos/api").Schedule} Schedule
+   * @typedef {import("@tipos/api").Trigger} Trigger
+   * @typedef {import("@tipos/api").RunRequest} RunRequest
+   * @typedef {import("@tipos/api").RunAccepted} RunAccepted
+   * @typedef {import("@tipos/api").RunWaited} RunWaited
+   * @typedef {import("@tipos/api").ScheduleRequest} ScheduleRequest
+   * @typedef {import("@tipos/api").WorkflowRunRequest} WorkflowRunRequest
    */
 
   /**
@@ -54,6 +60,15 @@
     return node;
   }
 
+  /**
+   * Chamada HTTP tipada pelo contrato. O `body` é sempre um payload declarado em
+   * types/api.d.ts, para o `tsc` conferir os campos de entrada tambem.
+   *
+   * @template [T=any]
+   * @param {string} path
+   * @param {{ method?: string, body?: RunRequest | ScheduleRequest | WorkflowRunRequest | object, headers?: Record<string, string> }} [options]
+   * @returns {Promise<T>}
+   */
   async function api(path, options = {}) {
     const headers = { ...(options.headers || {}) };
     if (state.token) headers.Authorization = `Bearer ${state.token}`;
@@ -77,6 +92,23 @@
     if (!response.ok) throw new Error((data && (data.error || data.message)) || `falha HTTP ${response.status}`);
     return data;
   }
+
+  /** @param {RunRequest} payload @returns {Promise<RunAccepted>} */
+  const submitRun = (payload) => api("/api/runs", { method: "POST", body: payload });
+
+  /** @param {RunRequest} payload @returns {Promise<RunWaited>} */
+  const runAndWait = (payload) => api("/api/runs?wait=true", { method: "POST", body: payload });
+
+  /** @param {ScheduleRequest} payload @returns {Promise<Schedule>} */
+  const postSchedule = (payload) => api("/api/schedules", { method: "POST", body: payload });
+
+  /**
+   * @param {string} name
+   * @param {WorkflowRunRequest} payload
+   * @returns {Promise<import("@tipos/api").WorkflowRun>}
+   */
+  const postWorkflowRun = (name, payload) =>
+    api(`/api/workflows/${encodeURIComponent(name)}/runs`, { method: "POST", body: payload });
 
   function toast(message, kind = "info") {
     const node = $("#toast");
@@ -410,10 +442,7 @@
     try {
       sendToPanel({ type: "sia:started", automation });
       // wait=true devolve as saídas em memória para o painel exibir (o histórico guarda só chaves)
-      const result = await api("/api/runs?wait=true", {
-        method: "POST",
-        body: { automation, params: params || {} },
-      });
+      const result = await runAndWait({ automation, params: params || {} });
       sendToPanel({
         type: "sia:result",
         automation,
@@ -500,6 +529,7 @@
     });
 
     async function submit() {
+      /** @type {Record<string, unknown>} */
       const params = {};
       for (const { param, input } of fields) {
         if (param.type === "BOOLEAN") {
@@ -519,7 +549,7 @@
       }
       foot.querySelectorAll("button").forEach((button) => (button.disabled = true));
       try {
-        const created = await api("/api/runs", { method: "POST", body: { automation: automation.id, params } });
+        const created = await submitRun({ automation: String(automation.id), params });
         watchRun(created.runId, automation.name || automation.id);
       } catch (error) {
         toast(error.message, "error");
@@ -695,6 +725,7 @@
     const automation = data.get("automation");
     if (!automation) return toast("Escolha uma automação.", "error");
     const frequency = data.get("frequency");
+    /** @type {Trigger} */
     let trigger;
     if (frequency === "interval") {
       const minutes = Number(data.get("minutes") || 15);
@@ -705,7 +736,7 @@
       trigger = { type: "cron", expression: String(data.get("cron") || "").trim() || "0 0 3 * * ?" };
     }
     try {
-      await api("/api/schedules", { method: "POST", body: { automation, trigger, params: {} } });
+      await postSchedule({ automation: String(automation), trigger, params: {} });
       toast("Agenda criada.");
       renderAgendas();
     } catch (error) {
@@ -772,7 +803,7 @@
 
   async function runWorkflow(name) {
     try {
-      const run = await api(`/api/workflows/${encodeURIComponent(name)}/runs`, { method: "POST", body: { inputs: {} } });
+      const run = await postWorkflowRun(name, { inputs: {} });
       toast(`Fluxo ${name} iniciado.`);
       openDrawer({
         eyebrow: "Fluxo",
