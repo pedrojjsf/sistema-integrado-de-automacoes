@@ -141,11 +141,14 @@ class ExecutionEngineTest {
 
   @Test
   void cancelamentoMarcaCancelled() throws Exception {
+    // sem o latch, sob carga o run pode ainda nao estar ativo quando cancelAll roda
+    java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
     PluginRuntime runtime =
         runtime(
             automation(
                 "fake.wait",
                 context -> {
+                  started.countDown();
                   while (!context.cancellation().isCancelled()) {
                     pause(20);
                   }
@@ -156,7 +159,7 @@ class ExecutionEngineTest {
     try (ExecutorService callers = Executors.newVirtualThreadPerTaskExecutor()) {
       Future<RunOutcome> future =
           callers.submit(() -> engine.execute(runtime, request("fake.wait")));
-      Thread.sleep(300);
+      assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
       assertThat(engine.cancelAll()).isEqualTo(1);
       RunOutcome outcome = future.get(5, TimeUnit.SECONDS);
 
