@@ -79,7 +79,8 @@ por mensagens — o resultado volta com valores, mas o histórico continua guard
 ![Painel do plugin](docs/screenshots/plugin-panel.png)
 
 ![Login](docs/screenshots/login.png)
-![Painel](docs/screenshots/painel.png)'
+![Painel](docs/screenshots/painel.png)
+![Plugins](docs/screenshots/plugins.png)'
 
 ## Escrever um plugin'
 

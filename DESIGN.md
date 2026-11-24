@@ -1,35 +1,39 @@
 ---
 name: SIA Console
-description: Console operacional do Sistema Integrado de Automações — clara, sóbria, feita para quem executa tarefas, não para quem depura HTTP.
+description: Console operacional do Sistema Integrado de Automações — sóbrio, denso na medida, feito para quem executa tarefas.
 colors:
-  surface: "#F6F5F1"
-  surface-raised: "#FFFFFF"
-  surface-sunken: "#ECE9E2"
-  ink: "#171A1F"
-  ink-soft: "#4C525C"
-  ink-faint: "#7B8189"
-  line: "#DFDBD2"
-  line-strong: "#C9C3B6"
+  paper: "#F6F5F1"
+  card: "#FFFFFF"
+  sunken: "#EEECE6"
+  sidebar: "#101519"
+  sidebar-raised: "#171D22"
+  ink: "#14171B"
+  ink-soft: "#545B65"
+  ink-faint: "#858B94"
+  on-dark: "#E8ECEF"
+  on-dark-soft: "#9AA3AC"
+  line: "#E4E0D7"
+  line-strong: "#CFC9BA"
   primary: "#0E5A5E"
   primary-hover: "#0A474B"
-  primary-soft: "#E1EDEC"
+  primary-soft: "#E3EFEE"
   success: "#1F6F43"
-  success-soft: "#E2EFE6"
   warning: "#8A5A00"
-  warning-soft: "#F6EBD5"
   danger: "#9E2B2B"
-  danger-soft: "#F6E1E0"
-  focus: "#0E5A5E"
 typography:
   display:
     fontFamily: "Segoe UI, system-ui, sans-serif"
-    fontSize: 30px
-    fontWeight: 600
+    fontSize: 28px
+    fontWeight: 650
     lineHeight: 1.15
-    letterSpacing: -0.02em
+  page-title:
+    fontFamily: "Segoe UI, system-ui, sans-serif"
+    fontSize: 24px
+    fontWeight: 650
+    lineHeight: 1.2
   title:
     fontFamily: "Segoe UI, system-ui, sans-serif"
-    fontSize: 20px
+    fontSize: 17px
     fontWeight: 600
     lineHeight: 1.3
   body:
@@ -37,113 +41,103 @@ typography:
     fontSize: 14px
     fontWeight: 400
     lineHeight: 1.55
-  label:
+  small:
     fontFamily: "Segoe UI, system-ui, sans-serif"
-    fontSize: 12px
-    fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: 0.04em
-  mono:
-    fontFamily: "Cascadia Mono, Consolas, monospace"
-    fontSize: 13px
+    fontSize: 12.5px
     fontWeight: 400
     lineHeight: 1.5
+  label:
+    fontFamily: "Segoe UI, system-ui, sans-serif"
+    fontSize: 11px
+    fontWeight: 650
+    lineHeight: 1.2
+    letterSpacing: 0.07em
+  mono:
+    fontFamily: "Cascadia Mono, Consolas, monospace"
+    fontSize: 12.5px
+    fontWeight: 400
 rounded:
   sm: 6px
-  md: 10px
-  lg: 16px
+  md: 9px
+  lg: 14px
   full: 999px
 spacing:
   xs: 4px
   sm: 8px
-  md: 16px
-  lg: 24px
-  xl: 40px
+  md: 14px
+  lg: 20px
+  xl: 32px
 components:
+  sidebar:
+    backgroundColor: "{colors.sidebar}"
+    padding: 20px
+  card:
+    backgroundColor: "{colors.card}"
+    rounded: "{rounded.lg}"
+    padding: 20px
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "#FFFFFF"
     rounded: "{rounded.md}"
-    padding: 10px
-  button-ghost:
-    backgroundColor: "{colors.surface-raised}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: 10px
-  card:
-    backgroundColor: "{colors.surface-raised}"
-    rounded: "{rounded.lg}"
-    padding: 20px
-  input:
-    backgroundColor: "#FFFFFF"
-    rounded: "{rounded.sm}"
-    padding: 9px
+    height: 34px
 ---
 
 # SIA Console
 
 ## Overview
 
-Quem usa este console é **operador de automação**, não desenvolvedor: a pessoa sabe qual tarefa
-precisa rodar (sincronizar catálogo, baixar guias, conferir pedidos), não sabe o que é `POST`.
-A interface existe para transformar um catálogo de automações em **formulários executáveis** e um
-histórico em **respostas compreensíveis**.
+Quem usa este console é **operador de automação**, não desenvolvedor. A interface existe para
+transformar um catálogo de plugins em telas executáveis e um histórico em respostas compreensíveis.
 
-Tom: calmo, técnico, sem drama. Papel quente em vez de branco clínico; uma cor de ação só; o resto
-é tipografia e espaço. Nada de gradiente, glassmorphism ou animação decorativa.
+Tom: calmo, técnico, sem drama. Papel quente, uma única cor de ação (verde-petróleo) e uma barra
+lateral escura que dá contraste e hierarquia. Nada de gradiente decorativo, glassmorphism ou
+animação que não comunique estado.
 
 ## Colors
 
-- **Primary (#0E5A5E)** — única cor de ação: botão Executar, link ativo, foco. Nunca em decoração.
-- **Surface (#F6F5F1)** — fundo papel; **surface-raised (#FFFFFF)** — cartões.
-- **Ink (#171A1F)** — texto principal; **ink-soft** — secundário; **ink-faint** — metadados.
-- **Line (#DFDBD2)** — divisores e bordas de 1px no lugar de sombra.
-- **Success/Warning/Danger** — só em status: pílulas de `SUCCESS`, `RUNNING`, `FAILURE`.
+- **Sidebar (#101519)** — âncora de contraste; itens em cinza-claro, ativo com barra de 2px em
+  `#3D9D97` e fundo `#16333A`. É o que separa "estrutura" de "conteúdo".
+- **Primary (#0E5A5E)** — só para ação: botão primário, link, foco. Nunca em decoração.
+- **Paper (#F6F5F1)** e **Card (#FFFFFF)** — superfícies; **Sunken (#EEECE6)** para pílulas neutras.
+- **Line (#E4E0D7)** — divisores de 1px no lugar de sombra.
+- **Success / Warning / Danger** — apenas estado: `SUCCESS`, `RUNNING`/`FAILURE`, erro de formulário.
 
 ## Typography
 
-Uma família sem serifa em todo o texto; monoespaçada apenas para **ids, datas e log**. Rótulo em
-caixa alta com `letter-spacing` para separar seções. Nada de mais de 3 pesos por tela.
+Uma família sem serifa em todo o texto; monoespaçada só para **ids, caminhos, datas e log**. Rótulos
+em caixa alta com `letter-spacing` de 0.07em. Três pesos por tela, no máximo: 400, 600 e 650.
 
 ## Layout
 
-Barra lateral fixa de 232px com navegação; conteúdo em coluna de até 1080px com `padding` de 32px.
-Grades de cartões com `gap` de 16px; em telas estreitas a barra vira topo e as grades viram uma
-coluna. Tudo alinhado à esquerda — a leitura é de cima para baixo.
+Barra lateral fixa de 248px. Conteúdo em coluna de até 1200px, `padding` de 32px, `gap` de 18px
+entre seções. Grades de cartões com mínimo de 320px. Em telas estreitas a barra vira topo e as
+grades viram uma coluna.
 
 ## Elevation & Depth
 
-Uma única camada elevada: **drawer** de detalhe da execução. Fora isso, profundidade é **borda de
-1px** e diferença de tom entre surface e surface-raised. Sombra só no drawer.
+Cartões têm sombra de 1px e borda; no hover sobem 1px com sombra de 26px. Diálogo e drawer usam a
+sombra forte (80px) com fundo escurecido a 36%. Nenhum outro elemento tem sombra.
 
 ## Shapes
 
-Cantos de 10px em controles e 16px em cartões. Pílulas de status totalmente arredondadas. Nada de
-canto vivo convivendo com arredondado na mesma tela.
+Cantos de 9px em controles, 14px em cartões e pílulas totalmente arredondadas. A mesma linguagem em
+toda a tela — nunca canto vivo convivendo com arredondado.
 
 ## Components
 
-- **Botão primário**: fundo `primary`, texto branco, altura 38px, largura pelo conteúdo. Um por tela.
-- **Botão secundário**: fundo branco, borda `line`, texto `ink`.
-- **Campo**: rótulo acima, altura 38px, borda `line`, foco com anel de 2px `primary-soft`.
-- **Pílula de status**: fundo suave da cor + texto forte, 11px, caixa alta.
-- **Cartão de automação**: nome, descrição, contagem de parâmetros e botão Executar.
-- **Drawer**: 480px à direita, cabeçalho com status + id curto, corpo com resultado, parâmetros e log.
-
-## Painel de plugin
-
-Todo plugin traz a própria tela — é obrigatório no manifesto. O catálogo mostra **um cartão por plugin**, nunca um por automação: as operações vivem dentro do painel. O console é só a moldura: cartão
-branco de 16px, cabeçalho com nome e versão do plugin, `iframe` ocupando o resto. O conteúdo dentro é
-do plugin; não aplicamos o nosso sistema de design ali, e é isso que permite telas ricas (prévia,
-tabela, etapas).
-
-O painel abre centralizado, com fundo escurecido a 36%, largura e altura vindas do manifesto (padrão
-560×460), no máximo `100vw - 48px`. Fechar é no ✕, no clique fora ou no `Esc` — sempre.
+- **Faixa de indicadores**: um cartão com quatro células separadas por linha; rótulo 11px, valor 26px.
+- **Cartão de plugin**: nome + versão em mono, descrição, operações em uma linha, rodapé separado
+  por linha com último status e o convite "Abrir painel →". O cartão inteiro é clicável.
+- **Pílula de status**: fundo suave da cor + texto forte, 10.5px, caixa alta, `nowrap`.
+- **Tabela**: cabeçalho 10.5px caixa alta, linhas de 1px, hover em `#FBFAF7`, ações à direita.
+- **Lista**: linhas com divisor de 1px dentro do cartão (usada em Fluxos), sem cartão dentro de cartão.
+- **Painel de plugin**: moldura do console com cabeçalho de 1 linha; o conteúdo é do plugin.
 
 ## Do's and Don'ts
 
-- Do mostrar **consequência** antes de executar: o que a automação faz e quais campos são obrigatórios.
-- Do traduzir erro de máquina (`BOT_BANCO_OCUPADO`) em frase com próxima ação.
+- Do mostrar **um cartão por plugin**: as operações vivem dentro do painel, não espalhadas.
+- Do usar a sidebar escura para separar estrutura de conteúdo; não repita a cor no conteúdo.
+- Do preferir uma linha de texto a um bloco quando a informação é secundária.
 - Don't usar `primary` para duas ações concorrentes na mesma tela.
-- Don't exibir token, parâmetro sensível ou saída de valor — o Core já não devolve, a UI não deve pedir.
-- Don't depender de ícone sozinho: todo ícone tem rótulo ou `aria-label`.
+- Don't exibir valor de parâmetro sensível — o Core já não devolve, a UI não deve pedir.
+- Don't empilhar cartão dentro de cartão: use lista com divisores.

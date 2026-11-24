@@ -212,12 +212,12 @@
   /* ---------------- navegação ---------------- */
 
   const VIEWS = {
-    painel: { label: "Painel", title: "Visão geral", render: renderPainel },
-    automacoes: { label: "Automações", title: "O que você pode executar", render: renderAutomacoes },
-    historico: { label: "Histórico", title: "Execuções", render: renderHistorico },
-    agendas: { label: "Agendas", title: "Execuções automáticas", render: renderAgendas },
-    workflows: { label: "Fluxos", title: "Fluxos de trabalho", render: renderWorkflows },
-    plugins: { label: "Plugins", title: "Plugins instalados", render: renderPlugins },
+    painel: { label: "Painel", title: "Visão geral", subtitle: "O que está acontecendo agora", render: renderPainel },
+    automacoes: { label: "Automações", title: "Plugins disponíveis", subtitle: "Cada plugin abre a própria tela", render: renderAutomacoes },
+    historico: { label: "Histórico", title: "Execuções", subtitle: "Quem executou, quando e com qual resultado", render: renderHistorico },
+    agendas: { label: "Agendas", title: "Execuções automáticas", subtitle: "O que roda sem ninguém apertar nada", render: renderAgendas },
+    workflows: { label: "Fluxos", title: "Fluxos de trabalho", subtitle: "Automações encadeadas em etapas", render: renderWorkflows },
+    plugins: { label: "Plugins", title: "Plugins instalados", subtitle: "Habilitar, desabilitar e remover", render: renderPlugins },
   };
 
   function navigate(view) {
@@ -227,6 +227,7 @@
     const config = VIEWS[view];
     $("#view-eyebrow").textContent = config.label;
     $("#view-title").textContent = config.title;
+    $("#view-subtitle").textContent = config.subtitle || "";
     $$(".nav a").forEach((link) => link.classList.toggle("active", link.dataset.view === view));
     loadConnection();
     config.render();
@@ -245,7 +246,7 @@
       state.health = await api("/api/health");
       dot.className = "status-dot on";
       const health = state.health;
-      label.textContent = health ? `v${health.version} · ${health.auth}` : "conectado";
+      label.textContent = health ? `Conectado · v${health.version}` : "conectado";
     } catch {
       dot.className = "status-dot off";
       label.textContent = "sem conexão";
@@ -256,64 +257,61 @@
 
   async function renderPainel() {
     const content = $("#content");
-    content.replaceChildren(h("div", { class: "empty" }, "Carregando…"));
+    content.replaceChildren(skeleton(3));
     try {
-      const [health, runs, plugins] = await Promise.all([
-        api("/api/health"),
-        api("/api/runs?limit=6"),
-        api("/api/plugins"),
-      ]);
+      const [health, runs, plugins] = /** @type {[Health, Run[], Plugin[]]} */ (
+        await Promise.all([api("/api/health"), api("/api/runs?limit=6"), api("/api/plugins")])
+      );
 
-      const enabled = plugins.filter((p) => p.state === "ENABLED").length;
-      const failures = runs.filter((r) => r.status !== "SUCCESS" && r.status !== "RUNNING");
+      const enabled = (plugins || []).filter((plugin) => plugin.state === "ENABLED").length;
+      const total = (plugins || []).length;
+      const failures = (runs || []).filter((run) => run.status !== "SUCCESS" && run.status !== "RUNNING");
+      const operacoes = (plugins || []).reduce((sum, plugin) => sum + (plugin.automations || []).length, 0);
 
       content.replaceChildren(
-        h(
-          "div",
-          { class: "card-grid" },
-          statCard("Execuções em andamento", health.running, "agora"),
-          statCard("Plugins ativos", `${enabled}/${plugins.length}`, "habilitados"),
-          statCard("Falhas recentes", failures.length, "últimas 6 execuções"),
-          statCard("Automações disponíveis", plugins.reduce((sum, p) => sum + p.automations.length, 0), "no catálogo"),
-        ),
-        h(
-          "section",
-          { class: "card" },
-          h(
-            "div",
-            { class: "card-head" },
-            h("div", {}, h("h3", { class: "title" }, "Últimas execuções"),
-              h("p", { class: "faint" }, "Clique para ver o resultado e o log")),
-            h("button", { class: "btn btn-sm", type: "button", onclick: () => navigate("automacoes") }, "Executar automação"),
-          ),
-          runs.length === 0
-            ? h("p", { class: "muted", style: "margin-top:12px" }, "Nenhuma execução ainda. Comece pela aba Automações.")
-            : runsTable(runs),
-        ),
+        h("section", { class: "stats-band" },
+          statCell("Em andamento", health.running ?? 0, "execuções agora"),
+          statCell("Plugins ativos", `${enabled}/${total}`, "habilitados"),
+          statCell("Operações", operacoes, "no catálogo"),
+          statCell("Falhas recentes", failures.length, "últimas 6 execuções")),
+        h("section", { class: "card" },
+          h("div", { class: "card-head" },
+            h("div", {},
+              h("h3", { class: "title" }, "Últimas execuções"),
+              h("p", { class: "muted small", style: "margin-top: 2px" }, "Clique em detalhes para ver o resultado e o log")),
+            h("button", { class: "btn btn-sm", type: "button", onclick: () => navigate("automacoes") }, "Executar")),
+          (runs || []).length === 0
+            ? emptyState("Nenhuma execução ainda", "Abra Automações e execute um plugin.")
+            : runsTable(runs || [])),
         health.failures && health.failures.length
-          ? h(
-              "section",
-              { class: "card" },
+          ? h("section", { class: "card" },
               h("h3", { class: "title" }, "Plugins que não carregaram"),
-              h("ul", { class: "muted", style: "margin:10px 0 0;padding-left:18px" },
-                health.failures.map((failure) => h("li", {}, failure))),
-            )
+              h("ul", { class: "muted small", style: "margin:10px 0 0;padding-left:18px" },
+                health.failures.map((failure) => h("li", {}, failure))))
           : null,
       );
     } catch (error) {
-      content.replaceChildren(h("div", { class: "empty" }, "Não foi possível carregar: " + error.message));
+      content.replaceChildren(emptyState("Não foi possível carregar", error.message));
     }
   }
 
-  function statCard(label, value, hint) {
-    return h(
-      "div",
-      { class: "card" },
-      h("div", { class: "stat" },
-        h("span", { class: "stat-label" }, label),
-        h("span", { class: "stat-value" }, String(value)),
-        h("span", { class: "faint" }, hint)),
-    );
+  function statCell(label, value, hint) {
+    return h("div", { class: "stat-cell" },
+      h("span", { class: "stat-label" }, label),
+      h("span", { class: "stat-value" }, String(value)),
+      h("span", { class: "stat-hint" }, hint));
+  }
+
+  function skeleton(rows) {
+    return h("div", { class: "skeleton", "aria-busy": "true" },
+      Array.from({ length: rows || 3 }, (_, index) =>
+        h("div", { class: "skeleton-row" + (index % 2 ? " w60" : " w40") })));
+  }
+
+  function emptyState(title, hint) {
+    return h("div", { class: "empty" },
+      h("strong", {}, title),
+      h("span", { class: "small" }, hint || ""));
   }
 
   /** @param {Run[]} runs */
@@ -341,56 +339,77 @@
 
   async function renderAutomacoes() {
     const content = $("#content");
-    content.replaceChildren(h("div", { class: "empty" }, "Carregando catálogo…"));
+    content.replaceChildren(skeleton(2));
     try {
-      const plugins = /** @type {Plugin[]} */ (await api("/api/plugins"));
-      const comOperacoes = plugins.filter((plugin) => (plugin.automations || []).length > 0);
+      const [plugins, runs] = /** @type {[Plugin[], Run[]]} */ (
+        await Promise.all([api("/api/plugins"), api("/api/runs?limit=30")])
+      );
+      const comOperacoes = (plugins || []).filter((plugin) => (plugin.automations || []).length > 0);
       if (comOperacoes.length === 0) {
-        content.replaceChildren(h("div", { class: "empty" }, "Nenhum plugin com automações instalado ainda."));
+        content.replaceChildren(emptyState("Nenhum plugin com automações", "Instale um plugin em Plugins."));
         return;
       }
+
+      // ultima execucao por plugin, para o cartao mostrar algo util
+      const ultima = new Map();
+      for (const run of runs || []) {
+        const alvo = String(run.automation || "");
+        const dono = (plugins || []).find((plugin) => (plugin.automations || []).includes(alvo));
+        if (dono && !ultima.has(dono.id)) ultima.set(dono.id, run);
+      }
+
       content.replaceChildren(
-        h("p", { class: "muted" },
-          "Cada plugin abre a própria tela — escolha o plugin e a operação é selecionada lá dentro."),
-        h("div", { class: "card-grid" }, comOperacoes.map((plugin) => pluginCard(plugin))),
+        h("div", { class: "card-grid" },
+          comOperacoes.map((plugin) => pluginCard(plugin, ultima.get(plugin.id)))),
       );
     } catch (error) {
-      content.replaceChildren(h("div", { class: "empty" }, "Falha ao carregar: " + error.message));
+      content.replaceChildren(emptyState("Falha ao carregar", error.message));
     }
   }
 
   /**
-   * Um cartão por plugin: as operações dele ficam dentro do painel, não espalhadas no catálogo.
+   * Um cartão por plugin. O cartão inteiro abre o painel; as operações ficam dentro dele.
    *
    * @param {Plugin} plugin
+   * @param {Run | undefined} ultima
    */
-  function pluginCard(plugin) {
+  function pluginCard(plugin, ultima) {
     const disabled = plugin.state !== "ENABLED";
     const operations = plugin.automations || [];
-    return h(
-      "article",
-      { class: "card" },
-      h("div", { class: "card-head" },
-        h("div", {},
-          h("h3", { class: "title" }, plugin.name),
-          h("p", { class: "mono faint", style: "margin-top:2px" }, `${plugin.id} · v${plugin.version}`)),
-        h("span", { class: "pill pill-neutral" },
-          `${operations.length} operaç${operations.length > 1 ? "ões" : "ão"}`)),
-      h("p", { class: "muted", style: "margin-top:10px;min-height:40px" },
-        plugin.description || "Sem descrição."),
-      h("div", { class: "row", style: "margin-top:6px;gap:6px" },
-        operations.map((id) => h("span", { class: "pill pill-neutral" }, id.split(".").pop()))),
-      h("div", { class: "row acoes", style: "justify-content:space-between" },
-        disabled ? h("span", { class: "pill pill-neutral" }, "plugin desabilitado") : h("span"),
-        h("button", {
-          class: "btn btn-primary btn-sm",
-          type: "button",
-          disabled,
-          onclick: () => openPluginPanel(plugin, null),
-        }, "Abrir painel")),
-    );
-  }
+    const partes = operations.map((id) => id.split(".").pop());
 
+    const abrir = () => {
+      if (!disabled) openPluginPanel(plugin, null);
+    };
+
+    return h("article", {
+      class: "card plugin-card" + (disabled ? " is-off" : ""),
+      role: "button",
+      tabindex: disabled ? "-1" : "0",
+      "aria-label": `Abrir painel de ${plugin.name}`,
+      onclick: abrir,
+      onkeydown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          abrir();
+        }
+      },
+    },
+      h("div", { class: "card-head" },
+        h("div", { style: "min-width: 0" },
+          h("h3", { class: "title" }, plugin.name),
+          h("p", { class: "card-meta mono" }, `${plugin.id} · v${plugin.version}`)),
+        h("span", { class: "card-count" }, `${operations.length} ${operations.length > 1 ? "operações" : "operação"}`)),
+      h("p", { class: "muted small", style: "margin-top: 10px" }, plugin.description || "Sem descrição."),
+      h("p", { class: "card-ops" }, partes.join(" · ")),
+      h("div", { class: "card-foot" },
+        ultima
+          ? h("span", { class: "row", style: "gap: 6px" },
+              statusPill(ultima.status),
+              h("span", { class: "faint small" }, dateTime(ultima.startedAt)))
+          : h("span", { class: "faint small" }, disabled ? "desabilitado" : "nunca executado"),
+        h("span", { class: "link-btn" }, disabled ? "indisponível" : "Abrir painel →")));
+  }
   /* ---------------- painel do plugin ---------------- */
 
   /**
@@ -514,8 +533,8 @@
         h("div", { class: "card" },
           h("div", { class: "card-head" },
             h("div", {}, h("h3", { class: "title" }, "Últimas 40 execuções"),
-              h("p", { class: "faint" }, "Quem executou, quando e com qual resultado")),
-            h("button", { class: "btn btn-sm", type: "button", onclick: () => navigate("historico") }, "Atualizar")),
+              h("p", { class: "muted small", style: "margin-top: 2px" }, "Da mais recente para a mais antiga")),
+            null),
           runsTable(runs)),
       );
     } catch (error) {
@@ -587,7 +606,7 @@
         h("div", {},
           h("h3", { class: "title" }, "Nova agenda"),
           h("p", { class: "faint" }, "Escolha a automação e com que frequência ela deve rodar.")),
-        h("div", { class: "form-grid" },
+        h("div", { class: "form-grid agenda-grid" },
           h("label", { class: "field" }, h("span", { class: "field-label" }, "Automação"),
             h("select", { name: "automation", required: true },
               h("option", { value: "" }, "selecione…"),
@@ -602,16 +621,16 @@
             h("input", { name: "cron", type: "text", placeholder: "0 0 3 * * ?" })),
           h("label", { class: "field", id: "minutes-field", hidden: true },
             h("span", { class: "field-label" }, "Intervalo em minutos"),
-            h("input", { name: "minutes", type: "number", min: "1", value: "15" }))),
-        h("div", { class: "row", style: "justify-content:flex-end" },
-          h("button", { class: "btn btn-primary", type: "submit" }, "Criar agenda")));
+            h("input", { name: "minutes", type: "number", min: "1", value: "15" })),
+          h("div", { class: "agenda-submit" },
+            h("button", { class: "btn btn-primary", type: "submit" }, "Criar agenda"))));
 
       content.replaceChildren(
         form,
         h("div", { class: "card" },
           h("h3", { class: "title" }, "Agendas ativas"),
           schedules.length === 0
-            ? h("p", { class: "muted", style: "margin-top:10px" }, "Nenhuma agenda criada ainda.")
+            ? emptyState("Nenhuma agenda criada", "Escolha uma automação acima e defina a frequência.")
             : h("table", { class: "table", style: "margin-top:12px" },
                 h("thead", {}, h("tr", {}, h("th", {}, "Automação"), h("th", {}, "Quando"),
                   h("th", {}, "Próxima"), h("th", {}, "Estado"), h("th", {}, ""))),
@@ -693,27 +712,28 @@
       content.replaceChildren(
         h("div", { class: "card" },
           h("h3", { class: "title" }, "Fluxos disponíveis"),
-          h("p", { class: "faint" }, "Um fluxo encadeia várias automações; a ordem é definida no arquivo do fluxo."),
+          h("p", { class: "muted small", style: "margin-top: 2px" }, "Um fluxo encadeia várias automações; a ordem vem do arquivo"),
           names.length === 0
-            ? h("p", { class: "muted", style: "margin-top:10px" }, "Nenhum fluxo publicado.")
-            : h("div", { class: "card-grid", style: "margin-top:14px" },
-                names.map((name) => h("article", { class: "card" },
-                  h("h4", { class: "title" }, name),
-                  h("p", { class: "mono faint" }, `workflows/${name}.yml`),
-                  h("div", { class: "row", style: "justify-content:flex-end;margin-top:12px" },
-                    h("button", { class: "btn btn-primary btn-sm", type: "button", onclick: () => runWorkflow(name) }, "Executar fluxo")))))),
+            ? emptyState("Nenhum fluxo publicado", "Crie um arquivo em workflows/.")
+            : h("div", { class: "lista" }, names.map((name) =>
+                h("div", { class: "lista-item" },
+                  h("div", {},
+                    h("div", { class: "title", style: "font-size: 14.5px" }, name),
+                    h("div", { class: "card-meta mono" }, `workflows/${name}.yml`)),
+                  h("button", { class: "btn btn-sm", type: "button", onclick: () => runWorkflow(name) }, "Executar")))),
+        ),
         h("div", { class: "card" },
           h("h3", { class: "title" }, "Execuções de fluxo"),
           runs.length === 0
-            ? h("p", { class: "muted", style: "margin-top:10px" }, "Nenhuma execução de fluxo ainda.")
+            ? emptyState("Nenhuma execução de fluxo", "Rode um fluxo para ver o resultado por etapa.")
             : h("table", { class: "table", style: "margin-top:12px" },
                 h("thead", {}, h("tr", {}, h("th", {}, "Fluxo"), h("th", {}, "Status"), h("th", {}, "Etapas"))),
                 h("tbody", {}, runs.map((run) =>
                   h("tr", {},
-                    h("td", { class: "mono" }, run.name),
-                    h("td", {}, statusPill(run.status)),
+                    h("td", { class: "mono" }, String(run.name || "—")),
+                    h("td", {}, statusPill(run.status || "—")),
                     h("td", { class: "muted" },
-                      Object.entries(run.nodes || {}).map(([id, status]) => `${id}: ${status}`).join(" · "))))))),
+                      Object.entries(run.nodes || {}).map(([id, status]) => `${id}: ${status}`).join(" · ") || "—")))))),
       );
     } catch (error) {
       content.replaceChildren(h("div", { class: "empty" }, "Falha ao carregar: " + error.message));
@@ -743,22 +763,31 @@
 
   async function renderPlugins() {
     const content = $("#content");
-    content.replaceChildren(h("div", { class: "empty" }, "Carregando plugins…"));
+    content.replaceChildren(skeleton(2));
     try {
-      const plugins = await api("/api/plugins");
+      const plugins = /** @type {Plugin[]} */ (await api("/api/plugins"));
+      if (!plugins.length) {
+        content.replaceChildren(emptyState("Nenhum plugin instalado", "Use POST /api/plugins/install."));
+        return;
+      }
       content.replaceChildren(
-        h("p", { class: "muted" }, "Desabilitar um plugin impede novas execuções até ele ser habilitado de novo."),
-        plugins.length === 0
-          ? h("div", { class: "empty" }, "Nenhum plugin instalado.")
-          : h("div", { class: "card-grid" }, plugins.map((plugin) =>
-              h("article", { class: "card" },
-                h("div", { class: "card-head" },
-                  h("div", {},
-                    h("h3", { class: "title" }, plugin.name),
-                    h("p", { class: "mono faint" }, `${plugin.id} · v${plugin.version}`)),
-                  statusPill(plugin.state)),
-                h("p", { class: "muted", style: "margin-top:10px" }, `${plugin.automations.length} automação(ões)`),
-                h("div", { class: "row", style: "justify-content:flex-end;margin-top:14px" },
+        h("div", { class: "card-grid" },
+          plugins.map((plugin) => {
+            const total = (plugin.automations || []).length;
+            return h("article", { class: "card" },
+              h("div", { class: "card-head" },
+                h("div", { style: "min-width: 0" },
+                  h("h3", { class: "title" }, plugin.name),
+                  h("p", { class: "card-meta mono" }, `${plugin.id} · v${plugin.version}`)),
+                statusPill(plugin.state)),
+              h("p", { class: "muted small", style: "margin-top: 10px" },
+                plugin.description || "Sem descrição."),
+              h("p", { class: "card-ops" },
+                `${total} ${total === 1 ? "automação" : "automações"}` +
+                  (total ? " · " + (plugin.automations || []).map((id) => id.split(".").pop()).join(" · ") : "")),
+              h("div", { class: "card-foot" },
+                h("span", { class: "faint small" }, plugin.state === "ENABLED" ? "recebendo execuções" : "sem execuções"),
+                h("span", { class: "row", style: "gap: 8px" },
                   h("button", {
                     class: "btn btn-sm",
                     type: "button",
@@ -768,10 +797,11 @@
                     class: "btn btn-sm btn-danger",
                     type: "button",
                     onclick: () => removePlugin(plugin),
-                  }, "Remover"))))),
+                  }, "Remover"))));
+          })),
       );
     } catch (error) {
-      content.replaceChildren(h("div", { class: "empty" }, "Falha ao carregar: " + error.message));
+      content.replaceChildren(emptyState("Falha ao carregar", error.message));
     }
   }
 

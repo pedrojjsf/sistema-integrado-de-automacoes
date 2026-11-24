@@ -4,18 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SIA — Sistema Integrado de Automações</title>
-    <link rel="stylesheet" href="/styles.css?v=12" />
+    <link rel="stylesheet" href="/styles.css?v=18" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230E5A5E'/><path d='M9 21V11h3l4 6 4-6h3v10h-3v-5l-4 6-4-6v5z' fill='white'/></svg>" />
   </head>
   <body>
-    <!-- visível por padrão: se o JS falhar, a tela de acesso continua aparecendo em vez de página em branco -->
     <div id="login" class="login">
       <form class="login-card" id="login-form">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true">SIA</span>
           <div>
             <h1 class="display">Sistema Integrado de Automações</h1>
-            <p class="muted">Entre com sua chave de acesso para continuar.</p>
+            <p class="muted small" style="margin-top: 6px">Entre com sua chave de acesso para continuar.</p>
           </div>
         </div>
         <label class="field">
@@ -23,27 +22,55 @@
           <input id="token-input" type="password" autocomplete="current-password" placeholder="cole a chave fornecida pelo administrador" required />
         </label>
         <p class="hint" id="login-error" hidden></p>
-        <button class="btn btn-primary" type="submit">Entrar</button>
+        <button class="btn btn-primary" type="submit" style="height: 38px">Entrar</button>
       </form>
     </div>
 
     <div id="app" class="app" hidden>
       <aside class="sidebar">
-        <div class="brand small">
+        <div class="sidebar-brand">
           <span class="brand-mark" aria-hidden="true">SIA</span>
-          <span class="brand-name">Automações</span>
+          <div>
+            <div class="brand-name">Automações</div>
+            <div class="brand-caption">console</div>
+          </div>
         </div>
+
         <nav class="nav" aria-label="Navegação principal">
-          <a href="#/painel" data-view="painel">Painel</a>
-          <a href="#/automacoes" data-view="automacoes">Automações</a>
-          <a href="#/historico" data-view="historico">Histórico</a>
-          <a href="#/agendas" data-view="agendas">Agendas</a>
-          <a href="#/workflows" data-view="workflows">Fluxos</a>
-          <a href="#/plugins" data-view="plugins">Plugins</a>
+          <p class="nav-label">Operação</p>
+          <a href="#/painel" data-view="painel">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="9.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></svg>
+            Painel
+          </a>
+          <a href="#/automacoes" data-view="automacoes">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 1.5 5.6 9l4.2 1.2 1.7-4.5"/><circle cx="4" cy="12" r="2.2"/></svg>
+            Automações
+          </a>
+          <a href="#/historico" data-view="historico">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.6V8l2.4 1.6"/></svg>
+            Histórico
+          </a>
+          <a href="#/agendas" data-view="agendas">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.8" y="2.8" width="12.4" height="11.4" rx="2"/><path d="M1.8 6.4h12.4M5.4 1.4v2.6M10.6 1.4v2.6"/></svg>
+            Agendas
+          </a>
+          <a href="#/workflows" data-view="workflows">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="3.4" cy="3.6" r="1.9"/><circle cx="12.6" cy="8" r="1.9"/><circle cx="3.4" cy="12.4" r="1.9"/><path d="M5.2 4.4 10.8 7.2M10.8 8.8 5.2 11.6"/></svg>
+            Fluxos
+          </a>
+
+          <p class="nav-label" style="padding-top: 16px">Administração</p>
+          <a href="#/plugins" data-view="plugins">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 1.8v3.1M8 11.1v3.1M1.8 8h3.1M11.1 8h3.1"/><circle cx="8" cy="8" r="2.6"/></svg>
+            Plugins
+          </a>
         </nav>
-        <div class="sidebar-foot">
-          <span class="status-dot" id="conn-dot" aria-hidden="true"></span>
-          <span id="conn-label" class="muted">conectando…</span>
+
+        <div class="sidebar-card">
+          <div class="sidebar-status">
+            <span class="status-dot" id="conn-dot" aria-hidden="true"></span>
+            <span id="conn-label">conectando…</span>
+          </div>
           <button class="link" id="logout" type="button">Sair</button>
         </div>
       </aside>
@@ -52,10 +79,11 @@
         <header class="topbar">
           <div>
             <p class="eyebrow" id="view-eyebrow">Painel</p>
-            <h2 class="title" id="view-title">Visão geral</h2>
+            <h2 class="page-title" id="view-title">Visão geral</h2>
+            <p class="muted small" id="view-subtitle" style="margin-top: 6px"></p>
           </div>
           <div class="topbar-actions">
-            <button class="btn btn-ghost" id="refresh" type="button">Atualizar</button>
+            <button class="btn btn-sm" id="refresh" type="button">Atualizar</button>
           </div>
         </header>
         <section id="content" class="content" aria-live="polite"></section>
@@ -72,12 +100,7 @@
           </div>
           <button class="icon-btn" data-close="panel" type="button" aria-label="Fechar">✕</button>
         </header>
-        <iframe
-          id="panel-frame"
-          class="panel-frame"
-          sandbox="allow-scripts allow-forms"
-          title="Interface do plugin"
-        ></iframe>
+        <iframe id="panel-frame" class="panel-frame" sandbox="allow-scripts allow-forms" title="Interface do plugin"></iframe>
       </section>
     </div>
 
@@ -98,6 +121,6 @@
 
     <div id="toast" class="toast" hidden></div>
 
-    <script src="/app.js?v=12"></script>
+    <script src="/app.js?v=18"></script>
   </body>
 </html>

@@ -62,12 +62,10 @@ await sleep(3500);
 const clicked = await cdp.send("Runtime.evaluate", {
   expression: `(() => {
     const filter = ${JSON.stringify(cardText)};
-    const buttons = [...document.querySelectorAll("button")].filter((b) => b.textContent.includes("Abrir painel"));
-    const button = filter
-      ? buttons.find((b) => (b.closest("article") || b).innerText.includes(filter))
-      : buttons[0];
-    if (!button) return "botao-nao-encontrado";
-    button.click();
+    const cards = [...document.querySelectorAll("article.plugin-card")];
+    const card = filter ? cards.find((c) => c.innerText.includes(filter)) : cards[0];
+    if (!card) return "cartao-nao-encontrado";
+    card.click();
     return "clicado";
   })()`,
   returnByValue: true,
