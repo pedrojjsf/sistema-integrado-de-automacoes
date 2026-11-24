@@ -10,5 +10,5 @@ permissions: [process]
 requires-os: [windows]
 ui:
   entry: ui/panel.html
-  width: 620
-  height: 620
+  width: 600
+  height: 500

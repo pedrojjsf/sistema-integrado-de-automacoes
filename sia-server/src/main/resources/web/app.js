@@ -343,23 +343,16 @@
     const content = $("#content");
     content.replaceChildren(h("div", { class: "empty" }, "Carregando catálogo…"));
     try {
-      const [automations, plugins] = /** @type {[Automation[], Plugin[]]} */ (
-        await Promise.all([api("/api/automations"), api("/api/plugins")])
-      );
-      // a automacao pode nao ter o prefixo do id do plugin (hello.say -> hello-plugin):
-      // o vinculo correto vem da lista de automacoes publicada por cada plugin
-      const byAutomation = new Map();
-      for (const plugin of plugins) {
-        for (const automationId of plugin.automations || []) byAutomation.set(automationId, plugin);
-      }
-      if (automations.length === 0) {
-        content.replaceChildren(h("div", { class: "empty" }, "Nenhuma automação instalada ainda."));
+      const plugins = /** @type {Plugin[]} */ (await api("/api/plugins"));
+      const comOperacoes = plugins.filter((plugin) => (plugin.automations || []).length > 0);
+      if (comOperacoes.length === 0) {
+        content.replaceChildren(h("div", { class: "empty" }, "Nenhum plugin com automações instalado ainda."));
         return;
       }
       content.replaceChildren(
-        h("p", { class: "muted" }, "Escolha o que executar. Automações com interface própria abrem o painel do plugin."),
-        h("div", { class: "card-grid" }, automations.map((automation) =>
-          automationCard(automation, byAutomation.get(automation.id)))),
+        h("p", { class: "muted" },
+          "Cada plugin abre a própria tela — escolha o plugin e a operação é selecionada lá dentro."),
+        h("div", { class: "card-grid" }, comOperacoes.map((plugin) => pluginCard(plugin))),
       );
     } catch (error) {
       content.replaceChildren(h("div", { class: "empty" }, "Falha ao carregar: " + error.message));
@@ -367,30 +360,33 @@
   }
 
   /**
-   * @param {Automation} automation
-   * @param {Plugin | undefined} plugin
+   * Um cartão por plugin: as operações dele ficam dentro do painel, não espalhadas no catálogo.
+   *
+   * @param {Plugin} plugin
    */
-  function automationCard(automation, plugin) {
-    const disabled = !plugin || plugin.state !== "ENABLED";
-    const paramCount = (automation.params || []).length;
+  function pluginCard(plugin) {
+    const disabled = plugin.state !== "ENABLED";
+    const operations = plugin.automations || [];
     return h(
       "article",
       { class: "card" },
       h("div", { class: "card-head" },
         h("div", {},
-          h("h3", { class: "title" }, automation.name || automation.id),
-          h("p", { class: "mono faint", style: "margin-top:2px" }, automation.id)),
-        paramCount
-          ? h("span", { class: "pill pill-neutral" }, `${paramCount} campo${paramCount > 1 ? "s" : ""}`)
-          : null),
-      h("p", { class: "muted", style: "margin-top:10px;min-height:40px" }, automation.description || "Sem descrição."),
-      h("div", { class: "row", style: "margin-top:14px;justify-content:space-between" },
+          h("h3", { class: "title" }, plugin.name),
+          h("p", { class: "mono faint", style: "margin-top:2px" }, `${plugin.id} · v${plugin.version}`)),
+        h("span", { class: "pill pill-neutral" },
+          `${operations.length} operaç${operations.length > 1 ? "ões" : "ão"}`)),
+      h("p", { class: "muted", style: "margin-top:10px;min-height:40px" },
+        plugin.description || "Sem descrição."),
+      h("div", { class: "row", style: "margin-top:6px;gap:6px" },
+        operations.map((id) => h("span", { class: "pill pill-neutral" }, id.split(".").pop()))),
+      h("div", { class: "row acoes", style: "justify-content:space-between" },
         disabled ? h("span", { class: "pill pill-neutral" }, "plugin desabilitado") : h("span"),
         h("button", {
           class: "btn btn-primary btn-sm",
           type: "button",
           disabled,
-          onclick: () => openPluginPanel(/** @type {Plugin} */ (plugin), automation),
+          onclick: () => openPluginPanel(plugin, null),
         }, "Abrir painel")),
     );
   }
@@ -406,7 +402,7 @@
   async function openPluginPanel(plugin, automation) {
     const frame = $("#panel-frame");
     $("#panel-eyebrow").textContent = `${plugin.name} · v${plugin.version}`;
-    $("#panel-title").textContent = automation ? automation.name || automation.id : plugin.name;
+    $("#panel-title").textContent = automation ? automation.name || automation.id : "Painel";
     const ui = plugin.ui;
     const window_ = $(".panel-window");
     window_.style.setProperty("--panel-w", `${ui.width}px`);

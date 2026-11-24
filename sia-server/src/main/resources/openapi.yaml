@@ -95,6 +95,9 @@ components:
           type: string
         version:
           type: string
+        description:
+          type: string
+          nullable: true
         state:
           type: string
           enum: [DISCOVERED, VALIDATED, LOADED, INITIALIZED, ENABLED, DISABLED, UNLOADED, FAILED]

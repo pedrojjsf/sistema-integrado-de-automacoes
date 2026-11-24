@@ -41,8 +41,7 @@ public final class ManifestValidator {
   private void validateUi(PluginManifest manifest) throws InvalidPluginException {
     if (manifest.ui() == null) {
       throw new InvalidPluginException(
-          "ui",
-          "obrigatorio: declare ui.entry com a pagina do plugin (ex.: ui/panel.html)");
+          "ui", "obrigatorio: declare ui.entry com a pagina do plugin (ex.: ui/panel.html)");
     }
     String entry = manifest.ui().entry();
     if (isBlank(entry)) {

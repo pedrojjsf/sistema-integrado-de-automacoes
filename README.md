@@ -59,7 +59,7 @@ O daemon serve a interface em **http://127.0.0.1:8080** (sem build, sem Node):
 | Tela | Para quê |
 |---|---|
 | Painel | execuções em andamento, plugins ativos, falhas recentes |
-| Automações | catálogo onde cada plugin abre o **próprio painel** (como a janela de um plugin de áudio). A interface é obrigatória: o console só desenha a moldura |
+| Automações | **um cartão por plugin** (não por automação): abre o painel do plugin, onde a operação é escolhida |
 | Histórico | últimas execuções com status, duração, ator e log |
 | Agendas | criar/pausar/remover execuções automáticas |
 | Fluxos | executar workflows e ver o status por etapa |

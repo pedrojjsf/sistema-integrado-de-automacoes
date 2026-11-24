@@ -277,6 +277,7 @@ public final class SiaServer implements AutoCloseable {
     view.put("id", plugin.id());
     view.put("name", plugin.manifest().name());
     view.put("version", plugin.manifest().version());
+    view.put("description", plugin.manifest().description());
     view.put("state", plugin.state().name());
     view.put("automations", plugin.instance().automations().stream().map(a -> a.id()).toList());
     var ui = plugin.manifest().ui();

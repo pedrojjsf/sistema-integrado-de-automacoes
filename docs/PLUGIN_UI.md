@@ -71,7 +71,7 @@ do console, sem `top.location`, sem cookie. A conversa é só por mensagens.
 
 | Mensagem | Quando | Conteúdo |
 |---|---|---|
-| `sia:init` | ao abrir | `plugin: {id, name}`, `automation: {id, name, description, params}` |
+| `sia:init` | ao abrir | `plugin: {id, name, version}`, `automation` (a que foi clicada, ou `null`), `automations` (todas as do plugin) |
 | `sia:started` | execução aceita | `automation` |
 | `sia:result` | execução terminou | `status`, `errorCode`, `message`, `outputs` **com valores**, `durationMillis`, `runId` |
 

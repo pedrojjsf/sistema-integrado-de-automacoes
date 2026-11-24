@@ -132,7 +132,7 @@ canto vivo convivendo com arredondado na mesma tela.
 
 ## Painel de plugin
 
-Todo plugin traz a própria tela — é obrigatório no manifesto. O console é só a moldura: cartão
+Todo plugin traz a própria tela — é obrigatório no manifesto. O catálogo mostra **um cartão por plugin**, nunca um por automação: as operações vivem dentro do painel. O console é só a moldura: cartão
 branco de 16px, cabeçalho com nome e versão do plugin, `iframe` ocupando o resto. O conteúdo dentro é
 do plugin; não aplicamos o nosso sistema de design ali, e é isso que permite telas ricas (prévia,
 tabela, etapas).

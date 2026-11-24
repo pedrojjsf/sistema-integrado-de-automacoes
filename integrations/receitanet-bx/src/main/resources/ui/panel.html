@@ -16,6 +16,8 @@
         font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px;
       }
       header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+      .topo { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+      .descricao { margin: 0 0 14px; color: var(--soft); font-size: 12.5px; }
       h1 { font-size: 15px; margin: 0; }
       .sub { color: var(--faint); font-size: 12px; margin-top: 2px; }
       .pill {
@@ -65,18 +67,16 @@
     </style>
   </head>
   <body>
-    <header>
-      <div>
-        <h1>Receitanet BX</h1>
-        <div class="sub" id="subtitulo">escolha a operação e execute</div>
-      </div>
+    <div class="topo">
       <span class="pill idle" id="estado">pronto</span>
-    </header>
+    </div>
 
     <label>
       <span>Operação</span>
       <select id="automacao"></select>
     </label>
+
+    <p class="descricao" id="subtitulo">escolha a operação e execute</p>
 
     <form id="campos" class="row" autocomplete="off"></form>
 
