@@ -47,7 +47,19 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Build e testes (Maven)
-        run: ./mvnw -B -ntp clean verify
+        run: |
+          set -o pipefail
+          ./mvnw -B -ntp clean verify 2>&1 | tee mvn-ci.log
+
+      - name: publicar log de falha
+        if: failure() && matrix.os == 'ubuntu-latest'
+        run: |
+          git config user.name ci-diag
+          git config user.email ci-diag@example.invalid
+          git checkout -B ci-ci-log
+          git add -f mvn-ci.log
+          git commit -m 'log de falha do ci' || true
+          git push --force origin ci-ci-log
 
       - name: Checagem de tipos do frontend
         run: npm run check
