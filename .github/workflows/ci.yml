@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
@@ -12,6 +19,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -30,11 +38,16 @@ jobs:
         with:
           node-version: '20'
 
+      # o bit de execução não é preservado ao commitar de um checkout Windows;
+      # sem isto o passo do Maven falha em "Permission denied" antes de qualquer teste
+      - name: Garantir bit de execução dos scripts
+        run: chmod +x mvnw bin/sia bin/siad || true
+
       - name: Dependências do frontend
         run: npm install --no-audit --no-fund
 
       - name: Build e testes (Maven)
-        run: ./mvnw -B clean verify
+        run: ./mvnw -B -ntp clean verify
 
       - name: Checagem de tipos do frontend
         run: npm run check
