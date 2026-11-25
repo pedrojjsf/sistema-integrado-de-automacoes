@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+# Cliente do SIA (Linux/macOS). Uso: bin/sia [start|stop|status|<comando do CLI>]
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+CLI="$ROOT/sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar"
+SERVER="$ROOT/sia-server/target/sia-server-1.0.0-SNAPSHOT-all.jar"
+LOCK="$ROOT/data/sia.db.lock"
+JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
+
+case "${1:-}" in
+  start)
+    if [ -f "$LOCK" ]; then
+      echo "SIA ja esta no ar (lock em $LOCK)"
+      exit 0
+    fi
+    nohup "$JAVA" -jar "$SERVER" "$ROOT/config/local.yml" >"$ROOT/logs/sia.log" 2>&1 &
+    echo "SIA subindo em http://127.0.0.1:8080 (log: logs/sia.log)"
+    ;;
+  stop)
+    if [ ! -f "$LOCK" ]; then
+      echo "SIA nao esta rodando"
+      exit 0
+    fi
+    pid="$(cat "$LOCK")"
+    kill "$pid" 2>/dev/null || true
+    rm -f "$LOCK"
+    echo "SIA parado (pid $pid)"
+    ;;
+  status)
+    shift
+    exec "$JAVA" -jar "$CLI" --token dev-token doctor "$@"
+    ;;
+  *)
+    exec "$JAVA" -jar "$CLI" "$@"
+    ;;
+esac

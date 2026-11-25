@@ -1,9 +1,9 @@
 @echo off
 rem Forma simples de iniciar: abre uma janela com o daemon rodando.
-rem Duplo clique ou: iniciar-sia.cmd
+rem Duplo clique ou: sia.cmd start
 rem Fechar a janela (ou sia.cmd stop) encerra o SIA.
 setlocal EnableExtensions
-set "ROOT=%~dp0"
+set "ROOT=%~dp0..\"
 set "JAR=%ROOT%sia-server\target\sia-server-1.0.0-SNAPSHOT-all.jar"
 
 if not exist "%JAR%" (

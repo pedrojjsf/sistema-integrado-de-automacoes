@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 23 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '23'
+          cache: maven
+
+      - name: Node 20 (só para a checagem de tipos do frontend)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Dependências do frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Build e testes (Maven)
+        run: ./mvnw -B clean verify
+
+      - name: Checagem de tipos do frontend
+        run: npm run check

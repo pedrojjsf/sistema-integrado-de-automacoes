@@ -8,11 +8,11 @@ setlocal EnableExtensions
 set "ROOT=%~dp0"
 
 if /I "%~1"=="start" (
-  call "%ROOT%iniciar-sia.cmd"
+  call "%ROOT%bin\iniciar-sia.cmd"
   exit /b 0
 )
 if /I "%~1"=="stop" (
-  call "%ROOT%parar-sia.cmd"
+  call "%ROOT%bin\parar-sia.cmd"
   exit /b 0
 )
 if /I "%~1"=="status" (

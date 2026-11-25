@@ -70,6 +70,67 @@ class SiaServerSemLoginTest {
   }
 
   @Test
+  void bloqueiaPostCrossOrigin() throws Exception {
+    HttpResponse<String> response = post("/api/runs", Map.of("Origin", "http://evil.example"), BODY);
+
+    assertThat(response.statusCode()).isEqualTo(403);
+  }
+
+  @Test
+  void bloqueiaHostQueNaoSejaLoopback() throws Exception {
+    // HttpClient não deixa forçar o header Host, então mandamos o pedido na mão por socket
+    String statusLine = rawPost("evil.example", BODY);
+
+    assertThat(statusLine).startsWith("HTTP/1.1 403");
+  }
+
+  private String rawPost(String host, String body) throws Exception {
+    try (java.net.Socket socket = new java.net.Socket("127.0.0.1", server.port())) {
+      socket.setSoTimeout(5000);
+      byte[] payload = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+      String request =
+          "POST /api/runs HTTP/1.1\r\n"
+              + "Host: "
+              + host
+              + "\r\n"
+              + "Content-Type: application/json\r\n"
+              + "Content-Length: "
+              + payload.length
+              + "\r\n"
+              + "Connection: close\r\n\r\n";
+      java.io.OutputStream out = socket.getOutputStream();
+      out.write(request.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+      out.write(payload);
+      out.flush();
+      try (java.io.BufferedReader reader =
+          new java.io.BufferedReader(
+              new java.io.InputStreamReader(socket.getInputStream(), java.nio.charset.StandardCharsets.US_ASCII))) {
+        return reader.readLine();
+      }
+    }
+  }
+
+  @Test
+  void aceitaPostSemOriginEHospedeiroLoopback() throws Exception {
+    HttpResponse<String> response = post("/api/runs", Map.of("Origin", "http://127.0.0.1:8080"), BODY);
+
+    // não é 403: o corpo inválido chega ao handler e vira 400
+    assertThat(response.statusCode()).isEqualTo(400);
+  }
+
+  private static final String BODY = "{\"automation\":\"nao.existe\",\"params\":{}}";
+
+  private static HttpResponse<String> post(String path, Map<String, String> headers, String body)
+      throws Exception {
+    HttpRequest.Builder builder =
+        HttpRequest.newBuilder(URI.create(base + path))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body));
+    headers.forEach(builder::header);
+    return http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+  }
+
+  @Test
   void recusaModoNoneForaDeLoopback() {
     SiaConfig exposto =
         new SiaConfig(

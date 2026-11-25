@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# Sobe o daemon do SIA em primeiro plano. Uso: bin/siad [config.yml]
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+SERVER="$ROOT/sia-server/target/sia-server-1.0.0-SNAPSHOT-all.jar"
+CONFIG="${1:-$ROOT/config/local.yml}"
+JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
+
+exec "$JAVA" -jar "$SERVER" "$CONFIG"

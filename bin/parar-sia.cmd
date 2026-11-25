@@ -1,7 +1,7 @@
 @echo off
 rem Para o daemon do SIA usando o pid gravado em data\sia.db.lock
 setlocal EnableExtensions
-set "ROOT=%~dp0"
+set "ROOT=%~dp0..\"
 set "LOCK=%ROOT%data\sia.db.lock"
 
 if not exist "%LOCK%" (

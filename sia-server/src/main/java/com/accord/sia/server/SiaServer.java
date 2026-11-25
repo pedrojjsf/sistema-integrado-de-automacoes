@@ -134,6 +134,8 @@ public final class SiaServer implements AutoCloseable {
   }
 
   private void registerRoutes() {
+    // Roda antes de qualquer autorização: em auth.mode=none, bloqueia CSRF e DNS rebinding.
+    app.before(ctx -> guardRequest(ctx));
     app.before(
         "/api/health", ctx -> authorize(ctx, Permission.HEALTH_READ, Permission.HEALTH_READ));
     app.before(
@@ -227,6 +229,65 @@ public final class SiaServer implements AutoCloseable {
     Permission required = "GET".equalsIgnoreCase(ctx.method().name()) ? read : write;
     authorizer.require(principal, required);
     ctx.attribute("principal", principal);
+  }
+
+  /**
+   * Em {@code auth.mode=none} não há header de autorização que impeça um site aberto no navegador de
+   * disparar {@code POST} contra o daemon via CSRF ou DNS rebinding (resolver o domínio do atacante
+   * para {@code 127.0.0.1}). Por isso, para requisições que mudam estado:
+   *
+   * <ul>
+   *   <li>o {@code Host} tem de ser loopback — bloqueia DNS rebinding;
+   *   <li>se houver {@code Origin} (navegador), ele tem de ser loopback — bloqueia CSRF.
+   * </ul>
+   *
+   * CLIs e curl não enviam {@code Origin}, então continuam funcionando; o navegador sempre envia
+   * {@code Origin} em POST cross-origin.
+   */
+  private void guardRequest(Context ctx) {
+    if (!"none".equals(authMode)) {
+      return;
+    }
+    String method = ctx.method().name();
+    if ("GET".equalsIgnoreCase(method)
+        || "HEAD".equalsIgnoreCase(method)
+        || "OPTIONS".equalsIgnoreCase(method)) {
+      return;
+    }
+
+    String host = headerHost(ctx.header("Host"));
+    if (!host.isEmpty() && !loopback(host)) {
+      throw new AuthorizationException(
+          AuthorizationException.Reason.FORBIDDEN,
+          "Host '" + host + "' nao permitido em auth.mode=none");
+    }
+
+    String origin = headerHost(ctx.header("Origin"));
+    if (!origin.isEmpty() && !loopback(origin)) {
+      throw new AuthorizationException(
+          AuthorizationException.Reason.FORBIDDEN,
+          "Origem cross-origin bloqueada em auth.mode=none");
+    }
+  }
+
+  /** Extrai só o host (sem porta/esquema) de um cabeçalho Host ou Origin. */
+  private static String headerHost(String value) {
+    if (value == null || value.isBlank()) {
+      return "";
+    }
+    String trimmed = value.trim();
+    if (trimmed.contains("://")) {
+      try {
+        trimmed = java.net.URI.create(trimmed).getHost();
+      } catch (IllegalArgumentException ignored) {
+        return trimmed;
+      }
+    }
+    if (trimmed == null) {
+      return "";
+    }
+    int colon = trimmed.indexOf(':');
+    return colon < 0 ? trimmed : trimmed.substring(0, colon);
   }
 
   private static String bearer(Context ctx) {

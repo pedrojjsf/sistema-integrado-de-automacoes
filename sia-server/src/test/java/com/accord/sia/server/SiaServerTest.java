@@ -84,6 +84,15 @@ class SiaServerTest {
   }
 
   @Test
+  void painelDoPluginRodaEmSandboxSemMesmaOrigem() throws Exception {
+    HttpResponse<String> page = get("/index.html", "admin-token");
+
+    // allow-scripts + allow-same-origin juntos quebrariam o isolamento do iframe
+    assertThat(page.body()).contains("sandbox=\"allow-scripts allow-forms\"");
+    assertThat(page.body()).doesNotContain("allow-same-origin");
+  }
+
+  @Test
   void entregaFolhasDeEstiloValidas() throws Exception {
     HttpResponse<String> css = get("/styles.css", "admin-token");
 

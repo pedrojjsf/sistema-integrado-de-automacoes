@@ -58,6 +58,7 @@ public final class ProcessPluginHost implements AutoCloseable {
       builder.directory(workingDirectory.toFile());
     }
     builder.redirectErrorStream(false);
+    SafeEnvironment.apply(builder);
     Process process = builder.start();
     return new ProcessPluginHost(process, events, command.get(0));
   }

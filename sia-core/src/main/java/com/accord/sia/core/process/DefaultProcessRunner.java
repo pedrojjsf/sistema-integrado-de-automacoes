@@ -54,6 +54,7 @@ public final class DefaultProcessRunner implements ProcessRunner {
       if (request.workingDirectory() != null) {
         builder.directory(request.workingDirectory().toFile());
       }
+      SafeEnvironment.apply(builder);
       process = builder.start();
     } catch (IOException error) {
       throw new ProcessException(

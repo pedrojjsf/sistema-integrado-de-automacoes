@@ -9,50 +9,46 @@ agenda execuções e orquestra tudo em **workflows** — sem conhecer a lógica 
 
 ## Rodar
 
-Requer **JDK 23**. Os scripts `sia.cmd`/`siad.cmd` usam `%JAVA_HOME%` quando existe, então
-funcionam mesmo com outro `java` no PATH.
+Requer **JDK 23** (o enforcer confere; JDK 25 LTS também passa). Os scripts `sia.cmd`/`siad.cmd`
+usam `%JAVA_HOME%` quando existe, então funcionam mesmo com outro `java` no PATH.
 
 ```bat
+:: empacota os jars do daemon e do CLI; -DskipTests pula a suíte na primeira vez
+:: (rode ./mvnw clean verify uma vez quando quiser o gate de cobertura + testes)
 mvnw.cmd -DskipTests package
 
 :: iniciar (abre uma janela com o daemon; fechá-la encerra o SIA)
-iniciar-sia.cmd
-:: ou: sia.cmd start
+sia.cmd start
 
 :: conferir / parar
 sia.cmd status
 sia.cmd stop
 
 :: usar
-sia.cmd --token dev-token plugins
-sia.cmd --token dev-token run receitanet.diag
+sia.cmd plugins
+sia.cmd run receitanet.diag
 ```
 
-No PowerShell: `.\iniciar-sia.cmd` e `.\sia.cmd status`.
+No Linux/macOS: `bin/sia start|stop|status` e `bin/siad` (equivalentes `.sh`).
 
 ### Adicionar um plugin
 
+A interface (`http://127.0.0.1:8080`) não instala plugins — a instalação é por API:
+
 ```bash
-# 1. gerar e empacotar (o JAR sai com plugin.yml dentro)
-mvn archetype:generate -DinteractiveMode=false \
-  -DarchetypeGroupId=com.accord -DarchetypeArtifactId=sia-plugin-archetype \
-  -DarchetypeVersion=1.0.0-SNAPSHOT -DgroupId=com.accord.plugins \
-  -DartifactId=meu-plugin -Dversion=1.0.0 -DpluginId=meu-plugin \
-  -Dpackage=com.accord.plugins.meu
-cd meu-plugin && mvn package
+curl -X POST localhost:8080/api/plugins/validate \
+  -H "Content-Type: application/json" \
+  -d '{"path":"C:/build/meu-plugin-1.0.0.jar"}'
 
-# 2. validar e instalar no daemon (sem reiniciar)
-curl -X POST localhost:8080/api/plugins/validate -H "Authorization: Bearer dev-token" \
-  -H "Content-Type: application/json" -d "{\"path\":\"C:/caminho/meu-plugin-1.0.0.jar\"}"
-
-curl -X POST localhost:8080/api/plugins/install -H "Authorization: Bearer dev-token" \
-  -H "Content-Type: application/json" -d "{\"path\":\"C:/caminho/meu-plugin-1.0.0.jar\"}"
-
-# 3. executar
-java -jar sia-cli/target/sia-cli-1.0.0-SNAPSHOT-all.jar --token dev-token plugins
+curl -X POST localhost:8080/api/plugins/install \
+  -H "Content-Type: application/json" \
+  -d '{"path":"C:/build/meu-plugin-1.0.0.jar"}'
 ```
 
-'## Interface web
+Depois é só executar: `sia.cmd plugins` e abrir o painel do plugin no console. Para **criar** o
+JAR a partir do zero, veja [Escrever um plugin](#escrever-um-plugin).
+
+## Interface web
 
 O daemon serve a interface em **http://127.0.0.1:8080** (sem build, sem Node):
 
@@ -65,12 +61,12 @@ O daemon serve a interface em **http://127.0.0.1:8080** (sem build, sem Node):
 | Fluxos | executar workflows e ver o status por etapa |
 | Plugins | habilitar, desabilitar e remover |
 
-''Por padrão (`auth.mode: none`) a interface abre direto: a autenticação de verdade acontece dentro
-de cada automação — certificado digital, por exemplo. Para exigir chave de acesso, use
-`auth.mode: dev` com `auth.tokens` preenchido; aí a primeira visita pede a chave.
+Por padrão (`auth.mode: none`) a interface abre direto: a autenticação de verdade acontece dentro de
+cada automação — certificado digital, por exemplo. Para exigir chave de acesso, use `auth.mode: dev`
+com `auth.tokens` preenchido; aí a primeira visita pede a chave.
 
-Agendas e horários usam o fuso de `scheduler.zone` (`America/Sao_Paulo` por padrão), então
-"03:00" significa 03:00 de Brasília mesmo com o servidor em UTC.
+Agendas e horários usam o fuso de `scheduler.zone` (`America/Sao_Paulo` por padrão), então "03:00"
+significa 03:00 de Brasília mesmo com o servidor em UTC.
 
 A linguagem visual está em [DESIGN.md](DESIGN.md). **Todo plugin traz a própria tela**
 ([docs/PLUGIN_UI.md](docs/PLUGIN_UI.md)): o console abre a página dele num painel isolado e conversa
@@ -80,9 +76,9 @@ por mensagens — o resultado volta com valores, mas o histórico continua guard
 
 ![Login](docs/screenshots/login.png)
 ![Painel](docs/screenshots/painel.png)
-![Plugins](docs/screenshots/plugins.png)'
+![Plugins](docs/screenshots/plugins.png)
 
-## Escrever um plugin'
+## Escrever um plugin
 
 Guia completo: [docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md).
 
@@ -94,7 +90,8 @@ mvn archetype:generate -DinteractiveMode=false \
   -DpluginId=meu-plugin -Dpackage=com.accord.plugins.meu
 ```
 
-O projeto gerado compila e testa com o `PluginTestKit` sem edição.
+O projeto gerado compila, testa com o `PluginTestKit` e já traz a `ui/panel.html` (interface
+obrigatória) sem edição.
 
 ## Verificação de tipos do frontend (opcional)
 
@@ -118,6 +115,16 @@ npm run types
 
 `mvnw clean verify` continua sem precisar de Node — o Node só é necessário para essa verificação.
 
+## Segurança
+
+- **Sem login (`auth.mode: none`) só em loopback**, e com proteção contra CSRF/DNS rebinding:
+  requisições que mudam estado exigem `Host` loopback e rejeitam `Origin` cross-origin.
+- **O painel de cada plugin roda em `iframe` sandbox** (`allow-scripts` sem `allow-same-origin`),
+  conversando por `postMessage` com validação de origem.
+- **Processos filhos não herdam segredos**: o ambiente é sanitizado (variáveis `SIA_SECRET_*`
+  são removidas) antes de subir qualquer executável.
+- Permissões por papel e deny-by-default para `storage`, `secrets` e `process`.
+
 ## Módulos
 
 | Módulo | Papel |
@@ -132,11 +139,17 @@ npm run types
 | `integrations/receitanet-bx` | primeiro plugin real (Receitanet BX) |
 | `examples/hello-plugin` | plugin mínimo de referência |
 
+`automacao/ReceitanetBX-Bot/` é o **binário oficial do Receitanet** (terceiros), acionado via
+`kind: process` — não é módulo Maven (ver `automacao/ReceitanetBX-Bot/README.md`).
+
 ## Verificar
 
 ```bash
-./mvnw clean verify     # 191 testes + gate de cobertura (core ≥ 80%)
+./mvnw clean verify     # 220+ testes + gate de cobertura (core ≥ 80%)
 ```
 
+Há CI em [.github/workflows/ci.yml](.github/workflows/ci.yml) (matriz Windows + Linux) que roda
+`./mvnw clean verify` e `npm run check` a cada push e pull request.
+
 Decisões registradas em [docs/adr/](docs/adr/README.md); plano de execução em
-[sia-core-plan.md](sia-core-plan.md).
+[docs/sia-core-plan.md](docs/sia-core-plan.md).
