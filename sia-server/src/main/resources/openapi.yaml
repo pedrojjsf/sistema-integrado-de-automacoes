@@ -74,7 +74,7 @@ components:
       properties:
         id:
           type: string
-          example: receitanet.diag
+          example: hello.say
         name:
           type: string
         description:
@@ -206,7 +206,7 @@ components:
       properties:
         automation:
           type: string
-          example: receitanet.diag
+          example: hello.say
         params:
           type: object
           additionalProperties: true

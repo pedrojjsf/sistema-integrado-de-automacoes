@@ -8,7 +8,7 @@ import java.util.Objects;
 /**
  * Pedido de execucao de uma automacao.
  *
- * @param automationId id qualificado (ex.: {@code receitanet.lote})
+ * @param automationId id qualificado (ex.: {@code demo.lote})
  * @param params parametros informados pelo solicitante
  * @param actor quem pediu (usuario, scheduler ou workflow)
  * @param trigger origem do disparo ({@code manual}, {@code schedule}, {@code workflow}, {@code

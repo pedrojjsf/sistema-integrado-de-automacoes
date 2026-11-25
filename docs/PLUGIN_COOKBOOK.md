@@ -137,7 +137,7 @@ try (PluginTestKit kit = PluginTestKit.start(new MeuPlugin(), Permissions.all())
 ```java
 return AutomationResult.failure(
     "BOT_BANCO_OCUPADO",
-    "o programa do Receitanet está aberto; feche e execute de novo");
+    "o programa externo está aberto; feche e execute de novo");
 ```
 
 A interface traduz `errorCode` conhecido para frase com próxima ação e mostra `message` como detalhe.

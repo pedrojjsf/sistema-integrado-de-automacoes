@@ -1,8 +1,8 @@
 # Guia do autor de plugin — SIA
 
 Este guia é o caminho completo: gerar, implementar, testar, validar e operar um plugin no
-**Sistema Integrado de Automações**. O exemplo real usado como referência é o
-[`receitanet-bx`](../integrations/receitanet-bx), que roda em produção.
+**Sistema Integrado de Automações**. O exemplo de referência é o
+[`hello-plugin`](../examples/hello-plugin), mínimo e executável.
 
 ---
 
@@ -18,8 +18,8 @@ Este guia é o caminho completo: gerar, implementar, testar, validar e operar um
 | Melhor para | automação de negócio em Java | wrapper de ferramenta externa, script, protótipo |
 
 Regra prática: **a automação já é um CLI?** → `process`. **Vai usar `Storage`, `Secrets` e
-`ProcessRunner` com frequência?** → `java`. Um adaptador `java` sobre uma CLI é o que o Receitanet
-usa (ADR-0001).
+`ProcessRunner` com frequência?** → `java`. Um adaptador `java` sobre uma CLI é o padrão quando a
+automação já existe como executável (ADR-0002).
 
 ---
 
@@ -212,7 +212,7 @@ Encadear em workflow (`workflows/meu-processo.yml`):
 name: meu-processo
 steps:
   - id: baixar
-    use: receitanet.baixar
+    use: demo.baixar
   - id: avisar
     use: meu-plugin.enviar
     needs: [baixar]
@@ -229,7 +229,7 @@ steps:
 | `PERMISSION_DENIED` | serviço usado sem permissão no manifesto | declarar em `permissions` e republicar |
 | `metadata.apiVersion incompativel` | plugin compilado contra outra major | recompilar contra a API 1.x atual |
 | `handshake falhou` (process) | plugin não respondeu `describe` em 15 s | conferir se o processo lê `stdin` e escreve JSON por linha |
-| `BOT_BANCO_OCUPADO` (Receitanet) | programa oficial aberto usando o mesmo Derby | fechar o oficial antes de rodar |
+| `RECURSO_OCUPADO` (exemplo do plugin) | o programa externo está aberto e usa o mesmo arquivo/porta | fechar o programa antes de rodar |
 | `PLUGIN_TIMEOUT` | plugin passou do tempo do passo | reduzir trabalho ou aumentar timeout na automação |
 | `ClassNotFoundException` no plugin | classe faltando no JAR (fora do shade) | empacotar dependências no artefato |
 

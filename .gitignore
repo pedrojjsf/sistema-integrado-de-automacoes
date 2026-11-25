@@ -23,9 +23,6 @@ logs/
 Thumbs.db
 
 # distribuicao do bot (binarios ~139 MB) - nao versionar no git
-automacao/ReceitanetBX-Bot/app/
-automacao/ReceitanetBX-Bot/runtime/
-automacao/ReceitanetBX-Bot/*.exe
 
 # toolkit local de agentes - nunca versionar
 .agents/

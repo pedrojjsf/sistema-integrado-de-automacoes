@@ -15,15 +15,14 @@
 | D11 | Autenticação | OIDC resource server; papéis `viewer/operator/admin` | abaixo |
 | D12 | Exposição | `:8080` atrás de reverse proxy | abaixo |
 | D13 | Ordem da auth | papéis e autorização agora; OIDC quando o IdP existir | abaixo |
-| D14 | Primeiro plugin | `receitanet-bx` como adaptador de processo | [ADR-0001](0001-receitanet-como-plugin-java.md) |
 | D15 | Execução de processo | `ProcessRunner` no Core com allowlist; plugin nunca recebe `ProcessBuilder` | [ADR-0005](0005-processo-controlado-pelo-core.md) |
 | D16 | Protocolo externo | `stdio-jsonl-v1` | [ADR-0002](0002-dois-modos-de-plugin.md) |
 | D17 | Interface do plugin | cada plugin pode trazer a própria tela (HTML no pacote, iframe + postMessage) | [ADR-0006](0006-interface-propria-do-plugin.md) |
 
 ## Decisões registradas só aqui
 
-- **D1 — Java 23 + Maven.** Alinhado ao bot do Receitanet (bytecode 67) e dá virtual threads,
-  records e `StructuredTaskScope`. Alternativa descartada: Java 21 exigiria recompilar o bot.
+- **D1 — Java 23 + Maven.** Dá virtual threads, records e `StructuredTaskScope`. JDK 23 é
+  non-LTS; a migração para 21 ou 25 (LTS) é uma decisão pendente registrada no roadmap.
 - **D3 — Permissões na fachada.** O `PermissionGuard` é único e compartilhado por log, storage,
   secrets e processos. `SecurityManager` não existe mais (JDK 24), então o limite é contrato, não
   sandbox. Quem precisa de isolamento real usa `kind: process`.
@@ -34,8 +33,8 @@
 - **D7 — Nomenclatura.** `com.accord` + `sia-*` desde o começo; renomear depois custa caro.
 - **D9 — Segredos por ambiente; assinatura adiada.** `SIA_SECRET_<PLUGIN>_<NOME>` resolve o
   namespace sem cofre. Assinatura e registry remoto entram quando houver servidor de plugins.
-- **D10 — Portabilidade.** Nenhum caminho Windows no Core, nenhum shell-out; o único ponto
-  Windows-específico é o plugin do Receitanet, que declara `requires-os`.
+- **D10 — Portabilidade.** Nenhum caminho Windows no Core, nenhum shell-out. Um plugin que precise
+  de SO específico declara `requires-os` no manifesto e o Core respeita.
 - **D11/D13 — Auth.** `Authenticator` é a única peça que troca quando o IdP for definido; papéis,
   rotas e testes de autorização já estão prontos.
 - **D12 — Reverse proxy.** TLS termina no proxy; o daemon só escuta em `127.0.0.1`.

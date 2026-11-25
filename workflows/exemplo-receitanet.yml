@@ -1,6 +1,0 @@
-name: exemplo-receitanet
-description: Executa o diagnostico do bot; serve de modelo para os proximos workflows
-steps:
-  - id: diagnostico
-    use: receitanet.diag
-    onError: CONTINUE

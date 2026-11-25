@@ -137,7 +137,7 @@ public final class SiaCli implements Runnable {
 
   @Command(name = "run", description = "Executa uma automacao")
   static final class Run extends Base {
-    @Parameters(index = "0", paramLabel = "AUTOMACAO", description = "ex.: receitanet.diag")
+    @Parameters(index = "0", paramLabel = "AUTOMACAO", description = "ex.: hello.say")
     String automation;
 
     @Option(

@@ -19,7 +19,6 @@
     <module>sia-cli</module>
     <module>sia-testkit</module>
     <module>sia-plugin-archetype</module>
-    <module>integrations/receitanet-bx</module>
     <module>examples/hello-plugin</module>
   </modules>
 

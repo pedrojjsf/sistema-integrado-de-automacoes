@@ -6,8 +6,8 @@
 
 ## Contexto
 
-A primeira automação real (`receitanet-bx`) é um app jpackage de 32 MB com Derby e AWT. Mas o time
-também vai querer plugins pequenos, em Java, usando `Storage` e `Secrets` diretamente. Forçar um
+Há automações que são um app jpackage de 32 MB com banco local e AWT, e há plugins pequenos em
+Java usando `Storage` e `Secrets`. Forçar um
 único modelo obrigaria a escolher entre isolamento e ergonomia.
 
 ## Decisão

@@ -146,7 +146,7 @@
 
   const EXPLAIN = {
     PERMISSION_DENIED: "o plugin tentou usar um recurso que não está autorizado no manifesto",
-    BOT_BANCO_OCUPADO: "o programa do Receitanet está aberto; feche-o e execute de novo",
+    BOT_BANCO_OCUPADO: "o programa externo está aberto; feche-o e execute de novo",
     BOT_TIMEOUT: "o robô passou do tempo limite; verifique a conexão e tente novamente",
     TIMEOUT: "a execução passou do tempo limite",
     PLUGIN_TIMEOUT: "o plugin de processo não respondeu a tempo",

@@ -1,0 +1,8 @@
+name: exemplo-hello
+description: executa o plugin de exemplo em uma etapa
+steps:
+  - id: saudacao
+    use: hello.say
+    with:
+      nome: "SIA"
+      idioma: "pt"

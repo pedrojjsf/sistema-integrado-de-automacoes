@@ -26,7 +26,7 @@ sia.cmd stop
 
 :: usar
 sia.cmd plugins
-sia.cmd run receitanet.diag
+sia.cmd run hello.say
 ```
 
 No Linux/macOS: `bin/sia start|stop|status` e `bin/siad` (equivalentes `.sh`).
@@ -72,10 +72,9 @@ A linguagem visual está em [DESIGN.md](DESIGN.md). **Todo plugin traz a própri
 ([docs/PLUGIN_UI.md](docs/PLUGIN_UI.md)): o console abre a página dele num painel isolado e conversa
 por mensagens — o resultado volta com valores, mas o histórico continua guardando só as chaves.
 
-![Painel do plugin](docs/screenshots/plugin-panel.png)
-
-![Login](docs/screenshots/login.png)
 ![Painel](docs/screenshots/painel.png)
+![Automações](docs/screenshots/automacoes.png)
+![Painel do plugin](docs/screenshots/plugin-panel.png)
 ![Plugins](docs/screenshots/plugins.png)
 
 ## Escrever um plugin
@@ -136,11 +135,7 @@ npm run types
 | `sia-cli` | cliente do daemon |
 | `sia-testkit` | harness para autores de plugin |
 | `sia-plugin-archetype` | geração de projeto de plugin |
-| `integrations/receitanet-bx` | primeiro plugin real (Receitanet BX) |
 | `examples/hello-plugin` | plugin mínimo de referência |
-
-`automacao/ReceitanetBX-Bot/` é o **binário oficial do Receitanet** (terceiros), acionado via
-`kind: process` — não é módulo Maven (ver `automacao/ReceitanetBX-Bot/README.md`).
 
 ## Verificar
 

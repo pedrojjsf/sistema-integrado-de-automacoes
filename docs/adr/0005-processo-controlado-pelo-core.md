@@ -6,7 +6,7 @@
 
 ## Contexto
 
-O plugin do Receitanet precisa executar um binário externo. Se o plugin recebesse `ProcessBuilder`,
+Um plugin pode precisar executar um binário externo. Se o plugin recebesse `ProcessBuilder`,
 a permissão `process` viraria execução arbitrária — qualquer plugin poderia rodar `cmd`, `curl` ou
 qualquer coisa com o usuário do daemon.
 
@@ -16,14 +16,14 @@ O Core expõe `ProcessRunner` e o plugin informa apenas um **nome lógico**:
 
 ```yaml
 processes:
-  receitanet-bx:
-    command: ["${java.home}/bin/java", "-cp", "app/receitanetbx-bot.jar", "numberia.bot.Inicio"]
+  demo-bot:
+    command: ["${java.home}/bin/java", "-cp", "app/bot.jar", "demo.Main"]
     timeout-minutes: 15
 ```
 
 ```java
 ProcessResult r = ctx.processes().run(
-    ProcessRequest.of("receitanet-bx", "diag").withTimeout(Duration.ofMinutes(2)));
+    ProcessRequest.of("demo-bot", "diag").withTimeout(Duration.ofMinutes(2)));
 ```
 
 O `DefaultProcessRunner` aplica:

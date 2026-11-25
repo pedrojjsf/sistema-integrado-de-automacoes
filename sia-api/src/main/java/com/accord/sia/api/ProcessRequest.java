@@ -12,7 +12,7 @@ import java.util.Objects;
  * de disco: se o plugin pudesse escolher o binario, a permissao {@code process} viraria execucao
  * arbitraria.
  *
- * @param executable nome logico registrado na allowlist (ex.: {@code receitanet-bx})
+ * @param executable nome logico registrado na allowlist (ex.: {@code demo-bot})
  * @param arguments argumentos adicionados ao comando base, na ordem
  * @param timeout limite de execucao; nulo usa o padrao do Core
  * @param redactValues valores que devem ser mascarados na saida capturada

@@ -13,8 +13,8 @@ e acompanhar o resultado. A decisão foi tornar a interface **obrigatória**:
 - o validador recusa manifesto sem `ui.entry`;
 - o console removeu o formulário gerado (`openRunForm`) e sempre abre o painel do plugin;
 - o `sia:init` passou a entregar **todas as automações do plugin**, para o painel montar a própria
-  navegação (o `receitanet-bx` usa isso para o seletor de operação);
-- o archetype e os plugins do repositório (`receitanet-bx`, `hello-plugin`) ganharam painel.
+  navegação (o painel de exemplo usa isso para o seletor de operação);
+- o archetype e o plugin de exemplo (`hello-plugin`) ganharam painel.
 
 ## Contexto
 

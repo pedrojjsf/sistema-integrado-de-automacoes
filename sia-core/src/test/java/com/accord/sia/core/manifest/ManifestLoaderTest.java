@@ -31,14 +31,14 @@ class ManifestLoaderTest {
 
   private static final String PROCESS_MANIFEST =
       """
-      id: receitanet-bx
-      name: Receitanet BX
+      id: demo-process
+      name: Demo Process
       version: 1.2.0
       api-version: "1.0"
       author: Accord
-      description: Baixa arquivos do Receitanet BX
+      description: Processa arquivos de exemplo
       kind: process
-      command: ["java", "-Djava.awt.headless=true", "-cp", "app/receitanetbx-bot.jar", "numberia.bot.Inicio"]
+      command: ["java", "-Djava.awt.headless=true", "-cp", "app/bot.jar", "demo.Main"]
       permissions: [process]
       requires-os: [windows]
       ui:
@@ -71,7 +71,7 @@ class ManifestLoaderTest {
     Path file = dir.resolve("plugin.yml");
     Files.writeString(file, PROCESS_MANIFEST);
 
-    assertThat(loader.read(file).id()).isEqualTo("receitanet-bx");
+    assertThat(loader.read(file).id()).isEqualTo("demo-process");
   }
 
   @Test
@@ -124,7 +124,7 @@ class ManifestLoaderTest {
   void rejeitaProcessSemCommand() {
     assertField(
         PROCESS_MANIFEST.replace(
-            "command: [\"java\", \"-Djava.awt.headless=true\", \"-cp\", \"app/receitanetbx-bot.jar\", \"numberia.bot.Inicio\"]",
+            "command: [\"java\", \"-Djava.awt.headless=true\", \"-cp\", \"app/bot.jar\", \"demo.Main\"]",
             ""),
         "command");
   }
@@ -149,7 +149,7 @@ class ManifestLoaderTest {
 
   @Test
   void rejeitaDependenciaDeSiMesmo() {
-    assertField(PROCESS_MANIFEST + "dependencies: [receitanet-bx]\n", "dependencies");
+    assertField(PROCESS_MANIFEST + "dependencies: [demo-process]\n", "dependencies");
   }
 
   @Test

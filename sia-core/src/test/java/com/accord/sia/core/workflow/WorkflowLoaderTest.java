@@ -15,7 +15,7 @@ class WorkflowLoaderTest {
       description: baixa, classifica e move
       steps:
         - id: baixar
-          use: receitanet.baixar
+          use: demo.baixar
           with:
             pedido: "${inputs.pedido}"
         - id: classificar
