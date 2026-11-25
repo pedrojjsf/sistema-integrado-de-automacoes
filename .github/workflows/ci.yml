@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -38,28 +38,23 @@ jobs:
         with:
           node-version: '20'
 
-      # o bit de execução não é preservado ao commitar de um checkout Windows;
-      # sem isto o passo do Maven falha em "Permission denied" antes de qualquer teste
-      - name: Garantir bit de execução dos scripts
-        run: chmod +x mvnw bin/sia bin/siad || true
-
       - name: Dependências do frontend
         run: npm install --no-audit --no-fund
 
+      # O bit de execução não é preservado ao commitar de um checkout Windows, e o wrapper
+      # precisa baixar o Maven (já falhou com "wget: Failed to fetch" no runner). Usamos o
+      # Maven pré-instalado da imagem e caímos para o wrapper só quando ele não existir.
       - name: Build e testes (Maven)
         run: |
-          set -o pipefail
-          ./mvnw -B -ntp clean verify 2>&1 | tee mvn-ci.log
-
-      - name: publicar log de falha
-        if: failure() && matrix.os == 'ubuntu-latest'
-        run: |
-          git config user.name ci-diag
-          git config user.email ci-diag@example.invalid
-          git checkout -B ci-ci-log
-          git add -f mvn-ci.log
-          git commit -m 'log de falha do ci' || true
-          git push --force origin ci-ci-log
+          set -euo pipefail
+          if command -v mvn >/dev/null 2>&1; then
+            echo "mvn: $(mvn -v | head -n 1)"
+            MVN=mvn
+          else
+            chmod +x mvnw
+            MVN=./mvnw
+          fi
+          "$MVN" -B -ntp clean verify
 
       - name: Checagem de tipos do frontend
         run: npm run check
