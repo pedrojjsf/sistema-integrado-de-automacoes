@@ -110,8 +110,7 @@ class PluginContractTest {
     assertThatThrownBy(() ->
             PluginContract.validateAutomations(List.of(automation(lote()), automation(lote()))))
         .isInstanceOfSatisfying(
-            InvalidPluginException.class,
-            error -> assertThat(error.field()).contains("demo.lote"));
+            InvalidPluginException.class, error -> assertThat(error.field()).contains("demo.lote"));
   }
 
   @Test
@@ -147,8 +146,7 @@ class PluginContractTest {
 
     assertThatThrownBy(() -> PluginContract.validate(descriptor))
         .isInstanceOfSatisfying(
-            InvalidPluginException.class,
-            error -> assertThat(error.field()).contains("demo.lote"));
+            InvalidPluginException.class, error -> assertThat(error.field()).contains("demo.lote"));
   }
 
   @Test

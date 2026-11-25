@@ -232,9 +232,9 @@ public final class SiaServer implements AutoCloseable {
   }
 
   /**
-   * Em {@code auth.mode=none} não há header de autorização que impeça um site aberto no navegador de
-   * disparar {@code POST} contra o daemon via CSRF ou DNS rebinding (resolver o domínio do atacante
-   * para {@code 127.0.0.1}). Por isso, para requisições que mudam estado:
+   * Em {@code auth.mode=none} não há header de autorização que impeça um site aberto no navegador
+   * de disparar {@code POST} contra o daemon via CSRF ou DNS rebinding (resolver o domínio do
+   * atacante para {@code 127.0.0.1}). Por isso, para requisições que mudam estado:
    *
    * <ul>
    *   <li>o {@code Host} tem de ser loopback — bloqueia DNS rebinding;

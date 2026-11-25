@@ -71,7 +71,8 @@ class SiaServerSemLoginTest {
 
   @Test
   void bloqueiaPostCrossOrigin() throws Exception {
-    HttpResponse<String> response = post("/api/runs", Map.of("Origin", "http://evil.example"), BODY);
+    HttpResponse<String> response =
+        post("/api/runs", Map.of("Origin", "http://evil.example"), BODY);
 
     assertThat(response.statusCode()).isEqualTo(403);
   }
@@ -104,7 +105,8 @@ class SiaServerSemLoginTest {
       out.flush();
       try (java.io.BufferedReader reader =
           new java.io.BufferedReader(
-              new java.io.InputStreamReader(socket.getInputStream(), java.nio.charset.StandardCharsets.US_ASCII))) {
+              new java.io.InputStreamReader(
+                  socket.getInputStream(), java.nio.charset.StandardCharsets.US_ASCII))) {
         return reader.readLine();
       }
     }
@@ -112,7 +114,8 @@ class SiaServerSemLoginTest {
 
   @Test
   void aceitaPostSemOriginEHospedeiroLoopback() throws Exception {
-    HttpResponse<String> response = post("/api/runs", Map.of("Origin", "http://127.0.0.1:8080"), BODY);
+    HttpResponse<String> response =
+        post("/api/runs", Map.of("Origin", "http://127.0.0.1:8080"), BODY);
 
     // não é 403: o corpo inválido chega ao handler e vira 400
     assertThat(response.statusCode()).isEqualTo(400);

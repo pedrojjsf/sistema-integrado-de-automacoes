@@ -6,8 +6,8 @@ import java.util.Map;
  * Ambiente de execução de processos filhos.
  *
  * <p>O daemon resolve segredos de plugins a partir de variáveis de ambiente ({@code
- * SIA_SECRET_&lt;plugin&gt;_&lt;nome&gt;}, ver ADR-0004/D9). Um processo iniciado por plugin herda o
- * ambiente do daemon, então herdaria esses segredos de graça. Antes de subir qualquer processo, o
+ * SIA_SECRET_&lt;plugin&gt;_&lt;nome&gt;}, ver ADR-0004/D9). Um processo iniciado por plugin herda
+ * o ambiente do daemon, então herdaria esses segredos de graça. Antes de subir qualquer processo, o
  * SIA remove as variáveis de segredo.
  */
 public final class SafeEnvironment {

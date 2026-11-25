@@ -232,7 +232,12 @@ public final class SiaCore implements AutoCloseable {
   private void startScheduler() {
     ScheduleRepository schedules = new ScheduleRepository(database, writer, Clock.systemUTC());
     this.scheduler =
-        new SchedulerService(schedules, this::launchScheduled, events, Clock.systemUTC());
+        new SchedulerService(
+            schedules,
+            this::launchScheduled,
+            events,
+            Clock.systemUTC(),
+            config.scheduler().zoneId());
     scheduler.start();
   }
 

@@ -47,6 +47,35 @@ class SiaCoreTest {
   }
 
   @Test
+  void agendaUsaOFusoConfiguradoENaoOFusoDaMaquina() throws Exception {
+    // regressao: o SiaCore criava o scheduler sem o fuso do config, entao um cron de 03:00
+    // disparava conforme o fuso do host (UTC em servidor/CI, Brasilia na maquina do dev)
+    core.close();
+    core =
+        SiaCore.start(
+            new SiaConfig(
+                new SiaConfig.Server("127.0.0.1", 0),
+                new SiaConfig.Database(temp.resolve("fuso.db").toString()),
+                new SiaConfig.Plugins(pluginsDirectory.toString()),
+                new SiaConfig.Auth("dev", Map.of()),
+                new SiaConfig.Scheduler("UTC"),
+                Map.of()));
+
+    var schedule =
+        core.scheduler()
+            .create(
+                "alpha.run",
+                new com.accord.sia.core.schedule.Trigger.Cron("0 0 3 * * ?"),
+                Map.of(),
+                "sub-1");
+
+    var horaUtc =
+        java.time.ZonedDateTime.ofInstant(schedule.nextFireAt(), java.time.ZoneOffset.UTC);
+    assertThat(horaUtc.getHour()).isEqualTo(3);
+    assertThat(horaUtc.getMinute()).isZero();
+  }
+
+  @Test
   void carregaPluginDoDiretorioEExecutaAutomacao() {
     assertThat(core.plugins()).hasSize(1);
     assertThat(core.automations()).extracting(descriptor -> descriptor.id()).contains("alpha.run");
