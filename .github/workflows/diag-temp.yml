@@ -1,0 +1,49 @@
+name: diag-temp
+
+# TEMPORARIO: captura a saida do Maven num branch para diagnostico.
+# Remover junto com o branch ci-log depois de identificar o erro.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '23'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: npm install
+        run: npm install --no-audit --no-fund > npm-install.log 2>&1 || true
+
+      - name: mvnw diagnostico
+        run: |
+          chmod +x mvnw
+          set +e
+          ./mvnw -B -ntp clean verify > mvn.log 2>&1
+          echo "maven_exit=$?" >> mvn.log
+          ./mvnw -v >> mvn.log 2>&1
+          java -version >> mvn.log 2>&1
+          tail -n 120 mvn.log
+
+      - name: publicar log
+        run: |
+          git config user.name "ci-diag"
+          git config user.email "ci-diag@example.invalid"
+          git checkout -B ci-log
+          git add -f mvn.log npm-install.log
+          git commit -m "ci diag log"
+          git push --force origin ci-log
