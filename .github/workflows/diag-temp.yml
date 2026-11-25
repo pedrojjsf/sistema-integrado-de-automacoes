@@ -21,9 +21,16 @@ jobs:
           distribution: temurin
           java-version: '23'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: npm install
+        run: npm install --no-audit --no-fund
+
       - name: mvnw diagnostico
         run: |
-          chmod +x mvnw
+          chmod +x mvnw bin/sia bin/siad || true
           set +e
           ./mvnw -B -ntp clean verify > mvn.log 2>&1
           echo "maven_exit=$?" >> mvn.log
