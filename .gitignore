@@ -32,3 +32,4 @@ erros/
 *.log.*
 *.lck
 node_modules/
+*.lock.pid
