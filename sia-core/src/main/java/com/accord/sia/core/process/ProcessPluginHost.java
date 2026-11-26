@@ -79,13 +79,24 @@ public final class ProcessPluginHost implements AutoCloseable {
         throw new IllegalStateException("plugin nao respondeu em " + timeout.toSeconds() + "s");
       }
       if ("__eof".equals(node.path("type").asText())) {
-        throw new IllegalStateException(
-            "plugin terminou a execucao (exit " + process.exitValue() + ")");
+        throw new IllegalStateException("plugin terminou a execucao" + exitSuffix());
       }
       return node;
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("espera pelo plugin interrompida", interrupted);
+    }
+  }
+
+  /**
+   * O EOF no stdout chega antes de o processo ser colhido pelo SO; {@code exitValue()} lança {@link
+   * IllegalThreadStateException} nessa janela. O codigo e informativo, nunca obrigatorio.
+   */
+  private String exitSuffix() {
+    try {
+      return " (exit " + process.exitValue() + ")";
+    } catch (IllegalThreadStateException stillRunning) {
+      return "";
     }
   }
 
